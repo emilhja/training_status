@@ -75,7 +75,14 @@ class Database:
         return total, rows
     
     def get_snapshots_for_analytics(self, columns: list[str], limit: int = 30) -> list[tuple]:
-        """Get specific columns for analytics."""
+        """Get specific columns for analytics.
+
+        Only columns present in SNAPSHOT_COLUMNS are allowed; unknown names raise ValueError.
+        """
+        _valid = set(SNAPSHOT_COLUMNS)
+        invalid = [c for c in columns if c not in _valid]
+        if invalid:
+            raise ValueError(f"Unknown column(s) requested: {invalid}")
         cols = ", ".join(columns)
         with self.connection() as conn:
             return conn.execute(
@@ -120,12 +127,16 @@ class Database:
             conn.execute("UPDATE goals SET is_active = 0 WHERE id = ?", (goal_id,))
 
 
-# Singleton instance
+# Singleton instance — intentionally process-scoped.
+# This works correctly with a single uvicorn worker (the default for this project).
+# If you ever switch to multi-worker mode (--workers N > 1), each worker gets its
+# own copy of this variable, which is safe with SQLite (one writer at a time) but
+# means schema init runs once per worker. Do not share this instance across threads.
 _db_instance: Optional[Database] = None
 
 
 def get_db(db_path: Optional[Path] = None) -> Database:
-    """Get or create database singleton."""
+    """Get or create the process-scoped database singleton."""
     global _db_instance
     if _db_instance is None:
         if db_path is None:

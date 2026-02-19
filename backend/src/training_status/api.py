@@ -2,8 +2,7 @@
 
 import csv
 import io
-import subprocess
-import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -27,7 +26,6 @@ from .services.analytics import (
 # Determine paths - project root is 3 levels up from api.py (src/training_status/)
 BASE_DIR = Path(__file__).parent.parent.parent.parent
 DIST_DIR = BASE_DIR / "frontend" / "dist"
-MAIN_PY = BASE_DIR / "backend" / "src" / "training_status" / "cli.py"
 
 app = FastAPI(title="Training Status API")
 
@@ -72,21 +70,23 @@ def get_snapshots(
 @app.post("/api/fetch", response_model=FetchResponse)
 def trigger_fetch():
     """Trigger a data fetch from external APIs."""
+    from .cli import generate_report
+    stdout_buf = io.StringIO()
+    stderr_buf = io.StringIO()
     try:
-        result = subprocess.run(
-            [sys.executable, str(MAIN_PY)],
-            capture_output=True, text=True, timeout=120,
-            cwd=str(BASE_DIR),
-        )
+        with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+            generate_report()
         return {
-            "success": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr or None,
+            "success": True,
+            "output": stdout_buf.getvalue(),
+            "error": stderr_buf.getvalue() or None,
         }
-    except subprocess.TimeoutExpired:
-        return {"success": False, "output": "", "error": "Timed out after 120s"}
     except Exception as e:
-        return {"success": False, "output": "", "error": str(e)}
+        return {
+            "success": False,
+            "output": stdout_buf.getvalue(),
+            "error": f"{e}\n{stderr_buf.getvalue()}".strip(),
+        }
 
 
 # --- GOALS ENDPOINTS ---

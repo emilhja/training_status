@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Light mode overrides */
+.light-mode {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Don't invert images and charts */
+.light-mode img,
+.light-mode svg,
+.light-mode canvas,
+.light-mode [class*="Chart"],
+.light-mode [class*="chart"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Keep emoji and icons looking normal */
+.light-mode [role="img"],
+.light-mode .emoji {
+  filter: invert(1) hue-rotate(180deg);
+}

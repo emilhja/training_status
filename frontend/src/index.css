@@ -1,21 +1,27 @@
 @import "tailwindcss";
 
-/* Light mode overrides */
+/*
+ * Light mode: override Tailwind v4's gray color tokens so every component
+ * that uses bg-gray-* / text-gray-* classes automatically reflects the theme.
+ * No filter hacks needed — the class is toggled on <html> by ThemeToggle.
+ *
+ * The mapping inverts the gray scale so the dark-first design reads correctly
+ * in light mode (gray-950 = near-white, gray-100 = near-black, etc.).
+ */
 .light-mode {
-  filter: invert(1) hue-rotate(180deg);
-}
+  /* Backgrounds */
+  --color-gray-950: oklch(0.99 0 0);       /* was: near-black  → now: near-white */
+  --color-gray-900: oklch(0.96 0.003 264); /* was: very dark   → now: very light */
+  --color-gray-800: oklch(0.92 0.005 264); /* was: dark        → now: light */
+  --color-gray-700: oklch(0.86 0.008 258); /* was: mid-dark    → now: mid-light */
 
-/* Don't invert images and charts */
-.light-mode img,
-.light-mode svg,
-.light-mode canvas,
-.light-mode [class*="Chart"],
-.light-mode [class*="chart"] {
-  filter: invert(1) hue-rotate(180deg);
-}
+  /* Neutral text / dividers */
+  --color-gray-600: oklch(0.60 0.015 258);
+  --color-gray-500: oklch(0.50 0.018 264);
 
-/* Keep emoji and icons looking normal */
-.light-mode [role="img"],
-.light-mode .emoji {
-  filter: invert(1) hue-rotate(180deg);
+  /* Text */
+  --color-gray-400: oklch(0.38 0.022 264); /* was: secondary   → now: darker */
+  --color-gray-300: oklch(0.28 0.025 258); /* was: primary     → now: dark */
+  --color-gray-200: oklch(0.18 0.028 258); /* was: bright      → now: very dark */
+  --color-gray-100: oklch(0.12 0.028 262); /* was: brightest   → now: near-black */
 }

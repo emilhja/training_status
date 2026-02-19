@@ -12,24 +12,9 @@ export default function ThemeToggle() {
   }, [])
 
   const applyTheme = (newTheme: 'dark' | 'light') => {
-    const root = document.documentElement
-    if (newTheme === 'light') {
-      root.style.setProperty('--bg-primary', '#ffffff')
-      root.style.setProperty('--bg-secondary', '#f3f4f6')
-      root.style.setProperty('--bg-tertiary', '#e5e7eb')
-      root.style.setProperty('--text-primary', '#111827')
-      root.style.setProperty('--text-secondary', '#4b5563')
-      root.style.setProperty('--text-muted', '#6b7280')
-      root.classList.add('light-mode')
-    } else {
-      root.style.removeProperty('--bg-primary')
-      root.style.removeProperty('--bg-secondary')
-      root.style.removeProperty('--bg-tertiary')
-      root.style.removeProperty('--text-primary')
-      root.style.removeProperty('--text-secondary')
-      root.style.removeProperty('--text-muted')
-      root.classList.remove('light-mode')
-    }
+    // Toggling .light-mode on <html> causes Tailwind's gray color variables to be
+    // overridden (see index.css), re-theming all components without filter hacks.
+    document.documentElement.classList.toggle('light-mode', newTheme === 'light')
   }
 
   const toggle = () => {

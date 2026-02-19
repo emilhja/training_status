@@ -9,75 +9,12 @@ import MetricCard from '../components/current/MetricCard'
 import TrainingLoadChart from '../components/charts/TrainingLoadChart'
 import HrvChart from '../components/charts/HrvChart'
 import WeeklyKmChart from '../components/charts/WeeklyKmChart'
-import type { Status } from '../types'
+import {
+  ctlStatus, atlStatus, tsbStatus, tsbZone, acStatus, sleepStatus, subjectiveStatus,
+  fmtSleep, fmt, fmtCadence,
+} from '../utils/metrics'
 
 type RightPanelTab = 'training' | 'health' | 'running' | 'all'
-
-// Status helpers
-function ctlStatus(ramp: number | null): Status {
-  if (ramp === null) return 'neutral'
-  if (ramp > 2)  return 'good'
-  if (ramp >= 0) return 'ok'
-  return 'bad'
-}
-
-function atlStatus(atl: number | null, ctl: number | null): Status {
-  if (!atl || !ctl) return 'neutral'
-  const r = atl / ctl
-  if (r < 1.0)  return 'good'
-  if (r <= 1.3) return 'ok'
-  return 'bad'
-}
-
-function tsbStatus(tsb: number | null): Status {
-  if (tsb === null) return 'neutral'
-  if (tsb > 5)   return 'good'
-  if (tsb > -10) return 'ok'
-  return 'bad'
-}
-
-function tsbZone(tsb: number | null): string {
-  if (tsb === null) return ''
-  if (tsb > 25)  return 'Transition'
-  if (tsb > 5)   return 'Fresh'
-  if (tsb > -10) return 'Grey Zone'
-  if (tsb > -30) return 'Overreaching'
-  return 'Very Overreached'
-}
-
-function acStatus(ac: number | null): Status {
-  if (ac === null) return 'neutral'
-  if (ac < 0.8 || ac > 1.5) return 'bad'
-  if (ac <= 1.3) return 'good'
-  return 'ok'
-}
-
-function sleepStatus(q: number | null): Status {
-  if (q === 1) return 'good'
-  if (q === 2) return 'ok'
-  if (q === 3) return 'bad'
-  return 'neutral'
-}
-
-function subjectiveStatus(v: number | null): Status {
-  if (v === null) return 'neutral'
-  if (v >= 4) return 'good'
-  if (v >= 3) return 'ok'
-  return 'bad'
-}
-
-function fmtSleep(secs: number | null): string {
-  if (!secs) return '—'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  return `${h}h${String(m).padStart(2, '0')}m`
-}
-
-function fmt(v: number | null, decimals = 1): string {
-  if (v === null) return '—'
-  return v.toFixed(decimals)
-}
-
 const tabButtons: { id: RightPanelTab; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'training', label: 'Training' },
@@ -149,7 +86,7 @@ export default function LayoutD_SplitView() {
               <MetricCard label="Total" value={fmt(s.total_distance_km, 0)} unit="km" />
               <MetricCard label="Runs" value={s.run_count ?? '—'} />
               {s.elevation_gain_m !== null && <MetricCard label="Elevation" value={fmt(s.elevation_gain_m)} unit="m" />}
-              {s.avg_cadence !== null && <MetricCard label="Cadence" value={Math.round(s.avg_cadence * 2)} unit="spm" />}
+              {s.avg_cadence !== null && <MetricCard label="Cadence" value={fmtCadence(s.avg_cadence)} unit="spm" />}
               {s.icu_rpe !== null && <MetricCard label="RPE" value={s.icu_rpe} unit="/10" />}
               {s.feel !== null && <MetricCard label="Feel" value={s.feel} unit="/5" status={subjectiveStatus(s.feel)} />}
             </div>

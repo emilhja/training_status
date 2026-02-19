@@ -31,77 +31,14 @@ import InjuryRiskPanel from '../components/features/InjuryRiskPanel'
 import CorrelationInsights from '../components/features/CorrelationInsights'
 import RacePredictor from '../components/features/RacePredictor'
 import { useState } from 'react'
-import type { Status } from '../types'
+import {
+  ctlStatus, atlStatus, tsbStatus, tsbZone, acStatus, sleepStatus, subjectiveStatus,
+  fmtSleep, fmt, fmtCadence,
+} from '../utils/metrics'
 
 type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'compact' | 'accordion'
 
 const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'compact', 'accordion']
-
-// Status helpers
-function ctlStatus(ramp: number | null): Status {
-  if (ramp === null) return 'neutral'
-  if (ramp > 2)  return 'good'
-  if (ramp >= 0) return 'ok'
-  return 'bad'
-}
-
-function atlStatus(atl: number | null, ctl: number | null): Status {
-  if (!atl || !ctl) return 'neutral'
-  const r = atl / ctl
-  if (r < 1.0)  return 'good'
-  if (r <= 1.3) return 'ok'
-  return 'bad'
-}
-
-function tsbStatus(tsb: number | null): Status {
-  if (tsb === null) return 'neutral'
-  if (tsb > 5)   return 'good'
-  if (tsb > -10) return 'ok'
-  return 'bad'
-}
-
-function tsbZone(tsb: number | null): string {
-  if (tsb === null) return ''
-  if (tsb > 25)  return 'Transition'
-  if (tsb > 5)   return 'Fresh'
-  if (tsb > -10) return 'Grey Zone'
-  if (tsb > -30) return 'Overreaching'
-  return 'Very Overreached'
-}
-
-function acStatus(ac: number | null): Status {
-  if (ac === null) return 'neutral'
-  if (ac < 0.8 || ac > 1.5) return 'bad'
-  if (ac <= 1.3) return 'good'
-  return 'ok'
-}
-
-function sleepStatus(q: number | null): Status {
-  if (q === 1) return 'good'
-  if (q === 2) return 'ok'
-  if (q === 3) return 'bad'
-  return 'neutral'
-}
-
-function subjectiveStatus(v: number | null): Status {
-  if (v === null) return 'neutral'
-  if (v >= 4) return 'good'
-  if (v >= 3) return 'ok'
-  return 'bad'
-}
-
-function fmtSleep(secs: number | null): string {
-  if (!secs) return '—'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  return `${h}h${String(m).padStart(2, '0')}m`
-}
-
-function fmt(v: number | null, decimals = 1): string {
-  if (v === null) return '—'
-  return v.toFixed(decimals)
-}
-
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⊞' },
   { id: 'training', label: 'Training', icon: '▲' },
@@ -209,7 +146,7 @@ export default function LayoutE_ThreePanel() {
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Latest Activity</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {s.elevation_gain_m !== null && <MetricCard label="Elevation" value={fmt(s.elevation_gain_m)} unit="m" />}
-                  {s.avg_cadence !== null && <MetricCard label="Cadence" value={Math.round(s.avg_cadence * 2)} unit="spm" />}
+                  {s.avg_cadence !== null && <MetricCard label="Cadence" value={fmtCadence(s.avg_cadence)} unit="spm" />}
                   {s.max_hr !== null && <MetricCard label="Max HR" value={s.max_hr} unit="bpm" />}
                   {s.icu_rpe !== null && <MetricCard label="RPE" value={s.icu_rpe} unit="/10" />}
                 </div>

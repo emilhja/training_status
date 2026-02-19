@@ -176,15 +176,16 @@ All endpoints return JSON and are documented with Pydantic models.
 | `/api/export/json` | GET | Export all data as JSON |
 | `/api/export/csv` | GET | Export all data as CSV |
 
-## Security Improvements
-
-This refactored version includes:
+## Security
 
 - **Input validation**: All API endpoints use Pydantic models
 - **SQL injection prevention**: Parameterized queries throughout
-- **CORS restrictions**: Limited to localhost:5173 in development
 - **Type safety**: Full type hints with mypy checking
-- **Environment management**: Centralized config with validation
+- **Environment management**: Centralized config with validation; credentials stored in `.env`, never committed
+
+**Authentication:** The API has **no authentication**. This is intentional — it is a personal tool designed to run on localhost. If you ever expose port 8000 on a network (e.g. via a reverse proxy or `--host 0.0.0.0`), add a layer of protection such as HTTP Basic Auth in your reverse proxy, a firewall rule, or a bearer token middleware.
+
+**CORS:** The `cors_origins` setting defaults to `http://localhost:5173` (the Vite dev server). In production the frontend is served from the same origin as the API, so CORS headers are not enforced and the setting has no effect in that mode.
 
 ## Development
 

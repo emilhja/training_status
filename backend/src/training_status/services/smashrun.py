@@ -20,6 +20,13 @@ class SmashrunClient:
         """Make authenticated GET request."""
         url = f"{self.base_url}/{endpoint}"
         response = requests.get(url, headers=self.headers, timeout=timeout)
+        if response.status_code in (401, 403):
+            raise PermissionError(
+                f"Smashrun token rejected (HTTP {response.status_code}). "
+                "The bearer token is temporary and will expire. "
+                "Refresh it at https://api.smashrun.com/explorer → Connect, "
+                "then copy the new access_token into your .env file."
+            )
         response.raise_for_status()
         return response.json()
     

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     db_path: Path = base_dir / "data" / "training_status.db"
     
     # API Settings
+    # cors_origins is only relevant in dev mode (Vite on :5173 → uvicorn on :8000).
+    # In production uvicorn serves the built frontend from the same origin, so
+    # browser requests never cross origins and CORS headers have no effect.
     cors_origins: list[str] = ["http://localhost:5173"]
     api_timeout: int = 30
     

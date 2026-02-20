@@ -1,4 +1,4 @@
-# Environment variables
+# Environment
 .env
 .env.local
 
@@ -34,7 +34,10 @@ data/*.db
 .DS_Store
 Thumbs.db
 
-# Node/Frontend
+# Node / Frontend
 node_modules/
 frontend/dist/
 *.local
+
+# Claude
+.claude/

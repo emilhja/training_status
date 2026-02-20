@@ -21,7 +21,6 @@ training_status/
 │   │           ├── smashrun.py
 │   │           └── analytics.py
 │   ├── tests/            # Test suite
-│   ├── requirements.txt
 │   └── pyproject.toml
 ├── frontend/             # React + Vite frontend
 │   ├── src/
@@ -29,22 +28,68 @@ training_status/
 │   └── package.json
 ├── data/                 # SQLite database (gitignored)
 ├── scripts/
-│   └── start.sh         # Production startup script
+│   └── setup.sh         # One-time setup script
 ├── docs/                # Documentation
 │   ├── API_FIELDS.md
 │   └── TODO.md
+├── requirements.txt      # Python dependencies
+├── start.sh             # Start the application
 └── README.md
 ```
+
+## Tech Stack
+
+### Backend
+| Technology | Version | Role |
+|---|---|---|
+| **Python** | ≥ 3.10 | Runtime |
+| **FastAPI** | ≥ 0.104 | HTTP API framework |
+| **Uvicorn** | ≥ 0.24 | ASGI server |
+| **Pydantic v2** | ≥ 2.5 | Data validation and serialization |
+| **pydantic-settings** | ≥ 2.1 | Config and `.env` loading |
+| **SQLite** | built-in | Storage (single-file, no server) |
+| **Requests** | ≥ 2.31 | HTTP client for external APIs |
+
+### Frontend
+| Technology | Version | Role |
+|---|---|---|
+| **React** | 19 | UI framework |
+| **TypeScript** | ~5.9 | Type safety |
+| **Vite** | 7 | Dev server and bundler |
+| **Tailwind CSS** | 4 | Utility-first styling |
+| **Recharts** | 3 | Charts (CTL/ATL/TSB, HRV, weekly km) |
+| **React Router** | 7 | Client-side routing between tabs |
+
+### External APIs
+| API | What it provides |
+|---|---|
+| **Intervals.icu Wellness API** | CTL, ATL, TSB, HRV, resting HR, sleep, VO2max |
+| **Smashrun API** | Lifetime run count, total distance, weekly km |
+
+### Dev tooling
+| Tool | Purpose |
+|---|---|
+| **pytest + pytest-asyncio** | Backend test suite |
+| **httpx** | Async HTTP client for FastAPI test client |
+| **ruff** | Python linting and formatting |
+| **mypy** | Static type checking |
+| **ESLint + typescript-eslint** | Frontend linting |
 
 ## Setup
 
 ```bash
+# First-time setup (creates venv, installs deps, sets up .env)
+./scripts/setup.sh
+```
+
+Or manually:
+
+```bash
 # Install backend dependencies
-cd backend
 pip install -r requirements.txt
 
 # Install frontend dependencies (for development)
-cd ../frontend
+cd frontend
 npm install
 ```
 
@@ -67,7 +112,7 @@ cp .env.example .env
 ### Web dashboard (production)
 
 ```bash
-./scripts/start.sh
+./start.sh
 ```
 
 Opens at [http://localhost:8000](http://localhost:8000). Builds the frontend if needed, then serves the API + SPA from a single uvicorn process.

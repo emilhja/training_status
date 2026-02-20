@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 echo "=== Setting up Training Status ==="
 echo ""
@@ -42,7 +42,7 @@ fi
 echo "Installing Python dependencies..."
 source .venv/bin/activate
 pip install -q --upgrade pip
-pip install -q -r requirements.txt
+pip install -q -r ../requirements.txt
 echo "Installing package in editable mode..."
 pip install -q -e .
 
@@ -93,7 +93,7 @@ echo "   Terminal 2: cd frontend && npm run dev"
 echo "   Then open http://localhost:5173"
 echo ""
 echo "3. To run in production mode:"
-echo "   ./scripts/start.sh"
+echo "   ./start.sh"
 echo "   Then open http://localhost:8000"
 echo ""
 echo "4. To use CLI only:"

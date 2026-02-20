@@ -44,7 +44,7 @@ source .venv/bin/activate
 pip install -q --upgrade pip
 pip install -q -r ../requirements.txt
 echo "Installing package in editable mode..."
-pip install -q -e .
+pip install -q -e . --no-deps
 
 cd ..
 echo "✅ Backend setup complete!"

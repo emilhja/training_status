@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Snapshot Models ---
@@ -94,10 +94,9 @@ class SnapshotBase(BaseModel):
 
 class Snapshot(SnapshotBase):
     """Full snapshot with ID."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    
-    class Config:
-        from_attributes = True
 
 
 class SnapshotList(BaseModel):
@@ -110,15 +109,14 @@ class SnapshotList(BaseModel):
 
 class Goal(BaseModel):
     """Training goal."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
     goal_type: str
     target_value: float
     period_start: Optional[str] = None
     is_active: bool = True
-    
-    class Config:
-        from_attributes = True
 
 
 class GoalCreate(BaseModel):

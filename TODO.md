@@ -36,7 +36,9 @@
 - [ ] Visual timeline with CTL targets
 - [ ] Race countdown integration
 
----
+
+### 13. Test out the unofficial garmin-connect repo
+- [ ] https://github.com/cyberjunky/python-garminconnect
 
 ## Completed Features ✅
 See API_FIELDS.md and git history for implemented features.

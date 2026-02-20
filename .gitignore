@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Generated output
+training_status.txt
+
 # Python
 __pycache__/
 *.py[cod]

@@ -274,14 +274,6 @@ def generate_report() -> None:
 
     print_history(db)
 
-    # Export to text file
-    filename = "training_status.txt"
-    with open(filename, "w") as f:
-        f.write(f"DAILY STATUS: {datetime.now()}\n" + "=" * 30 + "\n")
-        f.write(f"Intervals Data: {json.dumps({k: v for k, v in iv.items() if k != '_raw'})}\n")
-        f.write(f"Smashrun Data:  {json.dumps({k: v for k, v in sr.items() if k != '_raw'})}\n")
-    print(f"Report exported to {filename}")
-
 
 if __name__ == "__main__":
     generate_report()

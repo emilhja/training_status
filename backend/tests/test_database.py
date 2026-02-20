@@ -3,19 +3,18 @@
 import pytest
 
 from training_status.database import Database
+
 from .conftest import SNAPSHOT_DATA
 
-
 # --- Schema / Init ---
+
 
 def test_init_schema_creates_tables(temp_db: Database):
     """init_schema() produces the expected tables."""
     with temp_db.connection() as conn:
         tables = {
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
     assert "snapshots" in tables
     assert "goals" in tables
@@ -31,6 +30,7 @@ def test_double_init_is_idempotent(temp_db: Database):
 
 # --- Snapshot CRUD ---
 
+
 def test_insert_and_retrieve_latest(temp_db: Database):
     """Inserted snapshot is returned by get_latest_snapshot()."""
     row_id = temp_db.insert_snapshot(SNAPSHOT_DATA)
@@ -38,10 +38,7 @@ def test_insert_and_retrieve_latest(temp_db: Database):
 
     row = temp_db.get_latest_snapshot()
     assert row is not None
-    d = dict(zip(
-        ["id", "recorded_at", "ctl", "atl", "tsb"],
-        row[:5]
-    ))
+    d = dict(zip(["id", "recorded_at", "ctl", "atl", "tsb"], row[:5]))
     assert d["ctl"] == pytest.approx(45.0)
     assert d["tsb"] == pytest.approx(5.0)
     assert d["recorded_at"] == "2026-02-19T10:00:00"
@@ -55,6 +52,7 @@ def test_get_latest_returns_none_when_empty(temp_db: Database):
 def test_get_snapshots_pagination(temp_db: Database):
     """Pagination (limit/offset) returns correct rows and total."""
     import copy
+
     for i in range(5):
         data = copy.copy(SNAPSHOT_DATA)
         data["recorded_at"] = f"2026-02-{10 + i:02d}T10:00:00"
@@ -72,6 +70,7 @@ def test_get_snapshots_pagination(temp_db: Database):
 def test_get_snapshots_ordered_newest_first(temp_db: Database):
     """Snapshots are returned newest-first."""
     import copy
+
     for i in range(3):
         data = copy.copy(SNAPSHOT_DATA)
         data["recorded_at"] = f"2026-02-{15 + i:02d}T10:00:00"
@@ -83,6 +82,7 @@ def test_get_snapshots_ordered_newest_first(temp_db: Database):
 
 
 # --- Analytics query ---
+
 
 def test_get_snapshots_for_analytics_valid_columns(temp_db: Database):
     """Valid column request returns correct number of rows and values."""
@@ -99,6 +99,7 @@ def test_get_snapshots_for_analytics_rejects_unknown_column(temp_db: Database):
 
 
 # --- Goals CRUD ---
+
 
 def test_create_and_list_goals(temp_db: Database):
     """Created goal appears in active goals list."""

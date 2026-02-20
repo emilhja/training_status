@@ -109,27 +109,21 @@ cp .env.example .env
 
 ## Running
 
-### Web dashboard (production)
+### Dev mode (hot reload)
 
 ```bash
 ./start.sh
 ```
 
-Opens at [http://localhost:8000](http://localhost:8000). Builds the frontend if needed, then serves the API + SPA from a single uvicorn process.
+Starts the backend on [http://localhost:8000](http://localhost:8000) with `--reload` and the Vite frontend on [http://localhost:5173](http://localhost:5173).
 
-### Dev mode (hot reload)
+### Web dashboard (production)
 
 ```bash
-# Terminal 1 — API
-cd backend
-uvicorn training_status.api:app --reload --port 8000 --app-dir src
-
-# Terminal 2 — Frontend
-cd frontend
-npm run dev
+./start.sh --prod
 ```
 
-Opens at [http://localhost:5173](http://localhost:5173) with Vite hot reload.
+Builds the frontend if needed, then serves the API + SPA from a single uvicorn process on [http://localhost:8000](http://localhost:8000).
 
 ### CLI only (no web)
 

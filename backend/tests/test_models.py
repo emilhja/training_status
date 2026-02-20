@@ -24,10 +24,7 @@ def test_goal_create_negative_value():
 
 def test_recommendation_valid():
     rec = Recommendation(
-        recommendation="Easy run",
-        reason="Recovery day",
-        urgency="low",
-        color="green"
+        recommendation="Easy run", reason="Recovery day", urgency="low", color="green"
     )
     assert rec.urgency == "low"
     assert rec.color == "green"
@@ -39,7 +36,7 @@ def test_recommendation_invalid_urgency():
             recommendation="Easy run",
             reason="Recovery day",
             urgency="extreme",  # invalid
-            color="green"
+            color="green",
         )
 
 

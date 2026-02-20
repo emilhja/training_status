@@ -6,10 +6,10 @@ set -e
 cd "$(dirname "$0")"
 PROJECT_ROOT=$(pwd)
 
-# Parse arguments
-DEV_MODE=false
-if [ "$1" = "--dev" ] || [ "$1" = "-d" ]; then
-    DEV_MODE=true
+# Parse arguments — dev mode is default, use --prod to build and serve
+DEV_MODE=true
+if [ "$1" = "--prod" ] || [ "$1" = "-p" ]; then
+    DEV_MODE=false
 fi
 
 echo "=== Training Status ==="

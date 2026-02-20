@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from training_status.api import app
 from training_status.database import Database
+
 from .conftest import SNAPSHOT_DATA
 
 
@@ -28,6 +29,7 @@ def client_with_snapshot(temp_db: Database):
 
 # --- /api/snapshots/latest ---
 
+
 def test_latest_snapshot_empty(client: TestClient):
     """Returns 404 when no snapshots exist."""
     response = client.get("/api/snapshots/latest")
@@ -45,6 +47,7 @@ def test_latest_snapshot_returns_data(client_with_snapshot: TestClient):
 
 
 # --- /api/snapshots ---
+
 
 def test_snapshots_empty_list(client: TestClient):
     """Returns paginated response with total=0 and empty items."""
@@ -76,12 +79,13 @@ def test_snapshots_pagination(temp_db: Database):
 
 
 def test_snapshots_invalid_limit(client: TestClient):
-    """limit < 1 is rejected with 422."""
+    """Limit < 1 is rejected with 422."""
     response = client.get("/api/snapshots?limit=0")
     assert response.status_code == 422
 
 
 # --- /api/goals ---
+
 
 def test_create_and_list_goals(client: TestClient):
     """POST then GET goals round-trip."""
@@ -124,6 +128,7 @@ def test_create_goal_negative_value(client: TestClient):
 
 # --- /api/export ---
 
+
 def test_export_json(client_with_snapshot: TestClient):
     """JSON export returns list of snapshots."""
     resp = client_with_snapshot.get("/api/export/json")
@@ -153,6 +158,7 @@ def test_export_csv_empty(client: TestClient):
 
 
 # --- /api/fetch ---
+
 
 def test_fetch_calls_generate_report(client: TestClient):
     """POST /api/fetch invokes generate_report() and returns a response.

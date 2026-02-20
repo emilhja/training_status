@@ -1,17 +1,15 @@
 """CLI entry point for fetching and displaying training status."""
 
 import json
-import statistics
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
 from .config import get_settings
-from .database import get_db
+from .database import Database, get_db
 from .services.intervals import IntervalsClient
 from .services.smashrun import SmashrunClient
 
-
 # --- DISPLAY HELPERS ---
+
 
 def ctl_label(ramp_rate: float) -> str:
     if ramp_rate > 2:
@@ -67,6 +65,7 @@ def fmt_sleep(secs: int) -> str:
 
 # --- DISPLAY FORMATTERS ---
 
+
 def display_intervals(iv: dict) -> dict:
     """Format Intervals.icu data for display."""
     ctl = iv.get("ctl", 0)
@@ -74,21 +73,21 @@ def display_intervals(iv: dict) -> dict:
     tsb = iv.get("tsb", 0)
     ac = iv.get("ac_ratio")
     rr = iv.get("ramp_rate", 0)
-    
+
     lines = {
         "Fitness (CTL)": f"{ctl}  ({ctl_label(rr)})",
         "Fatigue (ATL)": f"{atl}  ({atl_label(atl, ctl)})",
         "Stress Balance (TSB)": f"{tsb}  ({tsb_label(tsb)}) — {tsb_zone(tsb)}",
         "Workload Ratio (A:C)": f"{ac}  ({ac_label(ac)})" if ac else "N/A",
     }
-    
+
     if iv.get("resting_hr"):
         lines["Resting HR"] = f"{iv['resting_hr']} bpm"
     if iv.get("hrv"):
         lines["HRV"] = f"{round(iv['hrv'])} ms"
     if iv.get("sleep_secs"):
         quality_map = {1: "Good", 2: "OK", 3: "Bad"}
-        q = quality_map.get(iv.get("sleep_quality"), "")
+        q = quality_map.get(iv.get("sleep_quality"), "")  # type: ignore[arg-type]
         score = f"  score {round(iv['sleep_score'])}/100" if iv.get("sleep_score") else ""
         lines["Sleep"] = f"{q + ' / ' if q else ''}{fmt_sleep(iv['sleep_secs'])}{score}"
     if iv.get("vo2max") is not None:
@@ -102,7 +101,7 @@ def display_intervals(iv: dict) -> dict:
     if iv.get("monotony") is not None:
         lines["Monotony"] = iv["monotony"]
         lines["Training Strain"] = iv["training_strain"]
-    
+
     return lines
 
 
@@ -114,31 +113,32 @@ def display_smashrun(sr: dict) -> dict:
         "Longest Run (km)": sr["longest_run_km"],
         "Avg Pace": sr["avg_pace"],
     }
-    
+
     lines["This week km"] = sr.get("week_0_km", 0)
     for i in range(1, 5):
         label = sr.get(f"week_{i}_label", f"Week -{i}")
         lines[f"Week {i} ({label}) km"] = sr.get(f"week_{i}_km", 0)
-    
+
     lines[f"Last Month ({sr['last_month_label']}) km"] = sr["last_month_km"]
     return lines
 
 
-def print_history(db):
+def print_history(db: Database) -> None:
     """Print recent history table."""
     rows = db.get_history(days=7)
-    
+
     if not rows:
         return
-    
+
     print("\n[History — last 7 records]")
     header = (
         f"  {'Date/Time':<20} {'CTL':>5} {'ATL':>5} {'TSB':>5} {'A:C':>5}"
-        f" {'HR':>4} {'HRV':>5} {'W0km':>6} {'W1km':>6} {'W2km':>6} {'W3km':>6} {'W4km':>6} {'Mokm':>7}"
+        f" {'HR':>4} {'HRV':>5}"
+        f" {'W0km':>6} {'W1km':>6} {'W2km':>6} {'W3km':>6} {'W4km':>6} {'Mokm':>7}"
     )
     print(header)
     print("  " + "-" * (len(header) - 2))
-    
+
     for r in rows:
         recorded_at, ctl, atl, tsb, ac, hr, hrv, w0, w1, w2, w3, w4, mo = r
         print(
@@ -229,12 +229,12 @@ def prepare_snapshot_data(iv: dict, sr: dict) -> dict:
     }
 
 
-def generate_report():
+def generate_report() -> None:
     """Generate and display training status report."""
     print(f"--- Fitness Status Report ({datetime.now().strftime('%Y-%m-%d %H:%M')}) ---")
-    
+
     settings = get_settings()
-    
+
     # Fetch from Intervals.icu
     print("\nFetching Intervals.icu...", end=" ", flush=True)
     try:
@@ -244,7 +244,7 @@ def generate_report():
     except Exception as e:
         iv = {}
         print(f"ERROR: {e}")
-    
+
     # Fetch from Smashrun
     print("Fetching Smashrun...", end=" ", flush=True)
     try:
@@ -254,26 +254,26 @@ def generate_report():
     except Exception as e:
         sr = {}
         print(f"ERROR: {e}")
-    
+
     # Display Intervals.icu data
     print("\n[Intervals.icu - Training Load & Health]")
     for key, val in display_intervals(iv).items():
         print(f"  {key}: {val}")
-    
+
     # Display Smashrun data
     print("\n[Smashrun - Running Totals]")
     for key, val in display_smashrun(sr).items():
         print(f"  {key}: {val}")
-    
+
     # Save to database
     db = get_db()
     if iv and sr:
         data = prepare_snapshot_data(iv, sr)
         db.insert_snapshot(data)
         print(f"\nSnapshot saved to {settings.db_path}")
-    
+
     print_history(db)
-    
+
     # Export to text file
     filename = "training_status.txt"
     with open(filename, "w") as f:

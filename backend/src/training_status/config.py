@@ -1,31 +1,30 @@
 """Centralized configuration management."""
 
-import os
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     # API Credentials
     intervals_id: str
     intervals_api_key: str
     smashrun_token: str
-    
+
     # Paths
     base_dir: Path = Path(__file__).parent.parent.parent.parent
     db_path: Path = base_dir / "data" / "training_status.db"
-    
+
     # API Settings
     # cors_origins is only relevant in dev mode (Vite on :5173 → uvicorn on :8000).
     # In production uvicorn serves the built frontend from the same origin, so
     # browser requests never cross origins and CORS headers have no effect.
     cors_origins: list[str] = ["http://localhost:5173"]
     api_timeout: int = 30
-    
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent.parent / ".env",
         "env_file_encoding": "utf-8",
@@ -36,4 +35,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    return Settings()  # type: ignore[call-arg]

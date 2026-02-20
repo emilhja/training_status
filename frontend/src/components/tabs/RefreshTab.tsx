@@ -24,8 +24,7 @@ export default function RefreshTab() {
       <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Fetch New Data</h2>
 
       <p className="text-sm text-gray-500 mb-6">
-        Runs <code className="bg-gray-800 px-1 rounded text-gray-300">main.py</code> to pull fresh data from
-        Intervals.icu and Smashrun, then saves a new snapshot to the database.
+        Pulls fresh data from Intervals.icu and Smashrun, then saves a new snapshot to the database.
       </p>
 
       <button

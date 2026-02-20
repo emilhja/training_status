@@ -224,6 +224,10 @@ def prepare_snapshot_data(iv: dict, sr: dict) -> dict:
         "weather_humidity": sr.get("weather_humidity"),
         "weather_wind_speed": sr.get("weather_wind_speed"),
         "weather_type": sr.get("weather_type"),
+        "strava_weekly_km": sr.get("strava_weekly_km"),
+        "strava_total_km": sr.get("strava_total_km"),
+        "strava_run_count": sr.get("strava_run_count"),
+        "strava_ytd_km": sr.get("strava_ytd_km"),
         "intervals_json": json.dumps(iv.get("_raw", {})),
         "smashrun_json": json.dumps(sr.get("_raw", {})),
     }
@@ -255,6 +259,19 @@ def generate_report() -> None:
         sr = {}
         print(f"ERROR: {e}")
 
+    # Fetch from Strava (optional)
+    if settings.strava_refresh_token:
+        print("Fetching Strava...", end=" ", flush=True)
+        try:
+            from .services.strava import StravaClient
+
+            strava_client = StravaClient(settings)
+            strava_data = strava_client.get_stats()
+            sr.update(strava_data)
+            print("ok")
+        except Exception as e:
+            print(f"ERROR: {e}")
+
     # Display Intervals.icu data
     print("\n[Intervals.icu - Training Load & Health]")
     for key, val in display_intervals(iv).items():
@@ -271,6 +288,24 @@ def generate_report() -> None:
         data = prepare_snapshot_data(iv, sr)
         db.insert_snapshot(data)
         print(f"\nSnapshot saved to {settings.db_path}")
+
+    # Detect personal records from fetched activities
+    pr_candidates = iv.get("_raw", {}).get("pr_candidates", [])
+    if pr_candidates:
+        new_prs = 0
+        for pr in pr_candidates:
+            is_new = db.upsert_record_if_pr(
+                distance_label=pr["distance_label"],
+                distance_m=pr["distance_m"],
+                time_secs=pr["time_secs"],
+                pace_str=pr["pace_str"],
+                activity_date=pr["activity_date"],
+                activity_id=pr["activity_id"],
+            )
+            if is_new:
+                new_prs += 1
+        if new_prs:
+            print(f"  🏆 {new_prs} new personal record(s) detected!")
 
     print_history(db)
 

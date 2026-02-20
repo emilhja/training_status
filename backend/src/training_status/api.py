@@ -2,10 +2,12 @@
 
 import csv
 import io
-from contextlib import redirect_stderr, redirect_stdout
+import logging
+from contextlib import asynccontextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
 
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -14,32 +16,94 @@ from fastapi.staticfiles import StaticFiles
 from .config import get_settings
 from .database import SNAPSHOT_COLUMNS, get_db
 from .models import (
+    AdherenceReport,
     ConsistencyScore,
     CorrelationsResponse,
+    DetrainingResponse,
     FetchResponse,
     GoalCreate,
     GoalList,
     InjuryRisk,
+    NoteCreate,
+    NoteList,
+    PersonalRecordsResponse,
     ProjectionsResponse,
     RacePredictorResponse,
     Recommendation,
     Snapshot,
     SnapshotList,
+    StravaStatus,
     SuccessResponse,
+    WeeklySummary,
 )
 from .services.analytics import (
     calculate_consistency_score,
+    calculate_detraining,
+    calculate_goal_adherence,
     calculate_injury_risk,
     calculate_projections,
     calculate_race_predictions,
+    calculate_weekly_summary,
     get_recommendation,
 )
+
+logger = logging.getLogger(__name__)
 
 # Determine paths - project root is 3 levels up from api.py (src/training_status/)
 BASE_DIR = Path(__file__).parent.parent.parent.parent
 DIST_DIR = BASE_DIR / "frontend" / "dist"
 
-app = FastAPI(title="Training Status API")
+
+def _run_scheduled_fetch() -> None:
+    """Run the daily data fetch (called by the background scheduler)."""
+    from .cli import generate_report
+
+    try:
+        generate_report()
+        logger.info("Scheduled fetch completed successfully")
+    except Exception as e:
+        logger.error("Scheduled fetch failed: %s", e)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> Any:  # type: ignore[type-arg]
+    """Start/stop the background scheduler on app lifecycle."""
+    settings = get_settings()
+    scheduler: BackgroundScheduler | None = None
+
+    if settings.fetch_schedule:
+        scheduler = BackgroundScheduler()
+        # Parse standard 5-field cron: "minute hour day month day_of_week"
+        fields = settings.fetch_schedule.split()
+        if len(fields) == 5:
+            minute, hour, day, month, day_of_week = fields
+            scheduler.add_job(
+                _run_scheduled_fetch,
+                "cron",
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=day_of_week,
+                id="daily_fetch",
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info("Scheduler started — fetch cron: %s", settings.fetch_schedule)
+        else:
+            logger.warning(
+                "Invalid FETCH_SCHEDULE cron '%s' — scheduler disabled",
+                settings.fetch_schedule,
+            )
+
+    yield
+
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+
+app = FastAPI(title="Training Status API", lifespan=lifespan)
 
 # CORS middleware
 settings = get_settings()
@@ -190,8 +254,12 @@ def get_projections() -> dict[str, Any]:
     if ctl is None or atl is None:
         return {"projections": [], "debug": f"CTL={ctl}, ATL={atl} - missing data"}
 
-    projections = calculate_projections(ctl, atl, ramp_rate)
-    return {"projections": projections, "current": {"ctl": ctl, "atl": atl, "tsb": tsb}}
+    projections, days_to_positive = calculate_projections(ctl, atl, ramp_rate)
+    return {
+        "projections": projections,
+        "current": {"ctl": ctl, "atl": atl, "tsb": tsb},
+        "days_to_positive_tsb": days_to_positive,
+    }
 
 
 @app.get("/api/analytics/injury-risk", response_model=InjuryRisk)
@@ -377,6 +445,136 @@ def get_race_prediction() -> dict[str, Any]:
         "d_prime_meters": d_prime,
         "fitness_level": readiness,
         "message": f"Predictions based on Critical Speed model. Current fitness: {readiness}.",
+    }
+
+
+# --- DETRAINING ENDPOINT ---
+
+
+@app.get("/api/analytics/detraining", response_model=DetrainingResponse)
+def get_detraining() -> dict[str, Any]:
+    """Estimate fitness/fatigue decay if training stops today."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(columns=["ctl", "atl"], limit=1)
+
+    if not rows or rows[0][0] is None or rows[0][1] is None:
+        return {
+            "points": [],
+            "current_ctl": 0.0,
+            "current_atl": 0.0,
+            "message": "No current fitness data available",
+        }
+
+    ctl, atl = rows[0]
+    points = calculate_detraining(ctl, atl)
+    week6_ctl = points[-1]["ctl"] if points else ctl
+    pct_lost = round((1 - week6_ctl / ctl) * 100) if ctl > 0 else 0
+
+    return {
+        "points": points,
+        "current_ctl": ctl,
+        "current_atl": atl,
+        "message": (
+            f"After 6 weeks without training, CTL drops ~{pct_lost}%"
+            f" (from {ctl:.0f} to {week6_ctl:.0f})"
+        ),
+    }
+
+
+# --- WEEKLY SUMMARY ENDPOINT ---
+
+
+@app.get("/api/analytics/summary", response_model=WeeklySummary)
+def get_weekly_summary() -> dict[str, Any]:
+    """Get a 7-day training digest vs the previous 7 days."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["ctl", "atl", "tsb", "hrv", "week_0_km", "rest_days"], limit=14
+    )
+    return calculate_weekly_summary(rows)
+
+
+# --- GOAL ADHERENCE ENDPOINT ---
+
+
+@app.get("/api/analytics/adherence", response_model=list[AdherenceReport])
+def get_goal_adherence() -> list[dict[str, Any]]:
+    """Show adherence history for active weekly_km goals."""
+    db = get_db()
+    goals = db.get_active_goals()
+    weekly_goals = [g for g in goals if g["goal_type"] == "weekly_km"]
+
+    if not weekly_goals:
+        return []
+
+    rows = db.get_snapshots_for_analytics(columns=["recorded_at", "week_0_km"], limit=60)
+
+    reports = []
+    for goal in weekly_goals:
+        report = calculate_goal_adherence(goal["target_value"], rows)
+        reports.append(report)
+
+    return reports
+
+
+# --- PERSONAL RECORDS ENDPOINTS ---
+
+
+@app.get("/api/personal-records", response_model=PersonalRecordsResponse)
+def get_personal_records() -> dict[str, Any]:
+    """Get all detected personal records."""
+    db = get_db()
+    rows = db.get_personal_records()
+    return {"records": [dict(r) for r in rows]}
+
+
+# --- TRAINING NOTES ENDPOINTS ---
+
+
+@app.get("/api/notes", response_model=NoteList)
+def get_notes(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    """Get training log notes."""
+    db = get_db()
+    rows = db.get_notes(limit=limit)
+    return {"items": [dict(r) for r in rows]}
+
+
+@app.post("/api/notes", response_model=SuccessResponse)
+def create_note(note: NoteCreate) -> dict[str, Any]:
+    """Add a training log note."""
+    db = get_db()
+    db.create_note(note_date=note.note_date, content=note.content)
+    return {"success": True}
+
+
+@app.delete("/api/notes/{note_id}", response_model=SuccessResponse)
+def delete_note(note_id: int) -> dict[str, Any]:
+    """Delete a training log note."""
+    db = get_db()
+    db.delete_note(note_id)
+    return {"success": True}
+
+
+# --- STRAVA STATUS ENDPOINT ---
+
+
+@app.get("/api/strava/status", response_model=StravaStatus)
+def get_strava_status() -> dict[str, Any]:
+    """Check if Strava integration is configured."""
+    settings = get_settings()
+    configured = bool(
+        settings.strava_client_id
+        and settings.strava_client_secret
+        and settings.strava_refresh_token
+    )
+    return {
+        "configured": configured,
+        "message": (
+            "Strava connected and active"
+            if configured
+            else "Strava not configured — add STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET,"
+            " STRAVA_REFRESH_TOKEN to .env"
+        ),
     }
 
 

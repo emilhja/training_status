@@ -4,6 +4,7 @@ import type { Projection } from '../../types'
 
 export default function ProjectionsChart() {
   const [projections, setProjections] = useState<Projection[]>([])
+  const [daysToPositive, setDaysToPositive] = useState<number | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -11,6 +12,7 @@ export default function ProjectionsChart() {
     fetchProjections()
       .then(data => {
         setProjections(data.projections || [])
+        setDaysToPositive(data.days_to_positive_tsb)
       })
       .catch(err => {
         console.error('Failed to fetch projections:', err)
@@ -42,6 +44,18 @@ export default function ProjectionsChart() {
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">7-Day Recovery Projection</h3>
         <span className="text-xs text-gray-500">If you rest 🛌</span>
       </div>
+
+      {/* Recovery countdown pill */}
+      {daysToPositive !== undefined && (
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-3
+          ${daysToPositive === null
+            ? 'bg-green-900/40 text-green-400'
+            : 'bg-orange-900/40 text-orange-400'}`}>
+          {daysToPositive === null
+            ? '✓ TSB already positive — you\'re fresh'
+            : `⏱ TSB turns positive in ${daysToPositive} day${daysToPositive !== 1 ? 's' : ''}`}
+        </div>
+      )}
       
       <p className="text-xs text-gray-500 mb-4">
         Projected Form (TSB) if you take complete rest. Higher = more recovered.

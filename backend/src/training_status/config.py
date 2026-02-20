@@ -14,9 +14,19 @@ class Settings(BaseSettings):
     intervals_api_key: str
     smashrun_token: str
 
+    # Strava (optional)
+    strava_client_id: str | None = None
+    strava_client_secret: str | None = None
+    strava_refresh_token: str | None = None
+
     # Paths
     base_dir: Path = Path(__file__).parent.parent.parent.parent
     db_path: Path = base_dir / "data" / "training_status.db"
+
+    # Scheduler
+    # Cron expression for automated daily fetch. Default: 6:00 AM every day.
+    # Set to empty string "" to disable the scheduler.
+    fetch_schedule: str = "0 6 * * *"
 
     # API Settings
     # cors_origins is only relevant in dev mode (Vite on :5173 → uvicorn on :8000).

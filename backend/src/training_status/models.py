@@ -92,6 +92,12 @@ class SnapshotBase(BaseModel):
     weather_wind_speed: float | None = None
     weather_type: str | None = None
 
+    # Strava (optional supplement)
+    strava_weekly_km: float | None = None
+    strava_total_km: float | None = None
+    strava_run_count: int | None = None
+    strava_ytd_km: float | None = None
+
 
 class Snapshot(SnapshotBase):
     """Full snapshot with ID."""
@@ -177,6 +183,7 @@ class ProjectionsResponse(BaseModel):
     projections: list[Projection]
     current: dict | None = None
     debug: str | None = None
+    days_to_positive_tsb: int | None = None
 
 
 class RiskFactor(BaseModel):
@@ -232,6 +239,125 @@ class RacePredictorResponse(BaseModel):
     critical_speed_ms: float | None = None
     d_prime_meters: float | None = None
     fitness_level: str
+    message: str
+
+
+# --- Detraining Models ---
+
+
+class DetrainingPoint(BaseModel):
+    """Single week in detraining forecast."""
+
+    week: int
+    ctl: float
+    atl: float
+    tsb: float
+    ctl_pct_lost: float
+
+
+class DetrainingResponse(BaseModel):
+    """Detraining estimator response."""
+
+    points: list[DetrainingPoint]
+    current_ctl: float
+    current_atl: float
+    message: str
+
+
+# --- Weekly Summary Models ---
+
+
+class WeeklySummary(BaseModel):
+    """7-day training summary."""
+
+    ctl_change: float | None = None
+    total_km: float | None = None
+    avg_hrv: float | None = None
+    rest_days: int | None = None
+    tsb_trend: str
+    message: str
+
+
+# --- Goal Adherence Models ---
+
+
+class WeekAdherence(BaseModel):
+    """Single week adherence entry."""
+
+    week_start: str
+    planned_km: float
+    actual_km: float
+    achieved: bool
+
+
+class AdherenceReport(BaseModel):
+    """Goal adherence report."""
+
+    target_km: float
+    overall_pct: int | None = None
+    streak: int
+    weeks: list[WeekAdherence]
+    message: str
+
+
+# --- Personal Record Models ---
+
+
+class PersonalRecord(BaseModel):
+    """A personal best for a given distance."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    detected_at: str
+    distance_label: str
+    distance_m: int
+    time_secs: float
+    pace_str: str
+    activity_date: str
+    activity_id: str | None = None
+
+
+class PersonalRecordsResponse(BaseModel):
+    """All personal records."""
+
+    records: list[PersonalRecord]
+
+
+# --- Training Note Models ---
+
+
+class Note(BaseModel):
+    """A training log entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: str
+    note_date: str
+    content: str
+
+
+class NoteCreate(BaseModel):
+    """Create a training note."""
+
+    note_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class NoteList(BaseModel):
+    """List of training notes."""
+
+    items: list[Note]
+
+
+# --- Strava Status Model ---
+
+
+class StravaStatus(BaseModel):
+    """Strava integration status."""
+
+    configured: bool
     message: str
 
 

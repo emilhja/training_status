@@ -73,6 +73,10 @@ SNAPSHOT_DATA = {
     "weather_humidity": 75,
     "weather_wind_speed": 10.0,
     "weather_type": "Cloudy",
+    "strava_weekly_km": None,
+    "strava_total_km": None,
+    "strava_run_count": None,
+    "strava_ytd_km": None,
     "intervals_json": "{}",
     "smashrun_json": "{}",
 }

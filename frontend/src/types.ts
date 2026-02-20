@@ -77,6 +77,12 @@ export interface Snapshot {
   weather_humidity: number | null
   weather_wind_speed: number | null
   weather_type: string | null
+
+  // Strava (optional supplement)
+  strava_weekly_km: number | null
+  strava_total_km: number | null
+  strava_run_count: number | null
+  strava_ytd_km: number | null
 }
 
 export interface SnapshotsResponse {
@@ -167,5 +173,74 @@ export interface RacePredictorResponse {
   critical_speed_ms: number
   d_prime_meters: number
   fitness_level: string
+  message: string
+}
+
+export interface ProjectionsResponse {
+  projections: Projection[]
+  current: { ctl: number; atl: number; tsb: number } | null
+  days_to_positive_tsb: number | null
+  debug?: string
+}
+
+export interface DetrainingPoint {
+  week: number
+  ctl: number
+  atl: number
+  tsb: number
+  ctl_pct_lost: number
+}
+
+export interface DetrainingResponse {
+  points: DetrainingPoint[]
+  current_ctl: number
+  current_atl: number
+  message: string
+}
+
+export interface WeeklySummary {
+  ctl_change: number | null
+  total_km: number | null
+  avg_hrv: number | null
+  rest_days: number | null
+  tsb_trend: 'improving' | 'declining' | 'stable' | 'unknown'
+  message: string
+}
+
+export interface WeekAdherence {
+  week_start: string
+  planned_km: number
+  actual_km: number
+  achieved: boolean
+}
+
+export interface AdherenceReport {
+  target_km: number
+  overall_pct: number | null
+  streak: number
+  weeks: WeekAdherence[]
+  message: string
+}
+
+export interface PersonalRecord {
+  id: number
+  detected_at: string
+  distance_label: string
+  distance_m: number
+  time_secs: number
+  pace_str: string
+  activity_date: string
+  activity_id: string | null
+}
+
+export interface Note {
+  id: number
+  created_at: string
+  note_date: string
+  content: string
+}
+
+export interface StravaStatus {
+  configured: boolean
   message: string
 }

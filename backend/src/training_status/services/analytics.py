@@ -111,9 +111,21 @@ def get_recommendation(
     }
 
 
-def calculate_projections(ctl: float, atl: float, ramp_rate: float | None) -> list[dict]:
-    """Project fitness/fatigue for next 7 days."""
+def calculate_projections(
+    ctl: float, atl: float, ramp_rate: float | None
+) -> tuple[list[dict], int | None]:
+    """Project fitness/fatigue for next 7 days.
+
+    Returns:
+        (projections list, days_to_positive_tsb or None if already positive / never reached)
+
+    """
+    current_tsb = ctl - atl
+    already_positive = current_tsb > 0
+
     projections = []
+    days_to_positive: int | None = None
+
     for day in range(1, 8):
         proj_ctl = ctl + (ramp_rate or 0) * (day / 7)
         proj_atl = atl * (0.9**day)  # ATL decays ~10% per day if no training
@@ -127,7 +139,194 @@ def calculate_projections(ctl: float, atl: float, ramp_rate: float | None) -> li
                 "zone": ("Optimal" if proj_tsb > 5 else "Grey" if proj_tsb > -10 else "Overreach"),
             }
         )
-    return projections
+        if days_to_positive is None and not already_positive and proj_tsb > 0:
+            days_to_positive = day
+
+    return projections, (None if already_positive else days_to_positive)
+
+
+def calculate_detraining(ctl: float, atl: float, weeks: int = 6) -> list[dict]:
+    """Project CTL/ATL/TSB decay if training stops today.
+
+    Uses standard time constants: CTL τ=42 days, ATL τ=7 days.
+    Returns one data point per week (days 0, 7, 14, ... weeks*7).
+    """
+    points = []
+    for w in range(weeks + 1):
+        d = w * 7
+        # Exponential decay: x(t) = x0 * (1 - 1/τ)^t
+        decay_ctl = (1 - 1 / 42) ** d
+        decay_atl = (1 - 1 / 7) ** d
+        proj_ctl = round(ctl * decay_ctl, 1)
+        proj_atl = round(atl * decay_atl, 1)
+        proj_tsb = round(proj_ctl - proj_atl, 1)
+        pct_ctl_lost = round((1 - decay_ctl) * 100, 1)
+        points.append(
+            {
+                "week": w,
+                "ctl": proj_ctl,
+                "atl": proj_atl,
+                "tsb": proj_tsb,
+                "ctl_pct_lost": pct_ctl_lost,
+            }
+        )
+    return points
+
+
+def calculate_weekly_summary(rows: list[tuple]) -> dict:
+    """Summarise the most recent 7-day period vs the 7 days before it.
+
+    rows columns (ordered): ctl, atl, tsb, hrv, week_0_km, rest_days
+    rows[0] = most recent, rows[-1] = oldest.
+    Expects at least 2 rows for delta calculation (ideally 14).
+    """
+    if not rows:
+        return {
+            "ctl_change": None,
+            "total_km": None,
+            "avg_hrv": None,
+            "rest_days": None,
+            "tsb_trend": "unknown",
+            "message": "No data available",
+        }
+
+    recent = rows[:7]
+    previous = rows[7:14] if len(rows) >= 14 else []
+
+    # CTL change: latest vs oldest in the window (or vs previous week's latest)
+    ctls = [r[0] for r in recent if r[0] is not None]
+    ctl_change: float | None = None
+    if ctls:
+        if previous:
+            prev_ctls = [r[0] for r in previous if r[0] is not None]
+            if prev_ctls:
+                ctl_change = round(ctls[0] - prev_ctls[0], 1)
+        elif len(ctls) >= 2:
+            ctl_change = round(ctls[0] - ctls[-1], 1)
+
+    # Weekly km: use the most recent week_0_km snapshot
+    week_kms = [r[4] for r in recent if r[4] is not None]
+    total_km = round(week_kms[0], 1) if week_kms else None
+
+    # Avg HRV
+    hrvs = [r[3] for r in recent if r[3] is not None]
+    avg_hrv: float | None = round(sum(hrvs) / len(hrvs), 1) if hrvs else None
+
+    # Rest days (most recent snapshot value)
+    rest_vals = [r[5] for r in recent if r[5] is not None]
+    rest_days = rest_vals[0] if rest_vals else None
+
+    # TSB trend
+    tsbs = [r[2] for r in recent if r[2] is not None]
+    if len(tsbs) >= 3:
+        recent_tsb = sum(tsbs[:3]) / 3
+        older_tsb = sum(tsbs[-3:]) / 3
+        if recent_tsb > older_tsb + 2:
+            tsb_trend = "improving"
+        elif recent_tsb < older_tsb - 2:
+            tsb_trend = "declining"
+        else:
+            tsb_trend = "stable"
+    else:
+        tsb_trend = "stable"
+
+    # Human-readable message
+    parts = []
+    if ctl_change is not None:
+        arrow = "+" if ctl_change >= 0 else ""
+        parts.append(f"{arrow}{ctl_change} CTL")
+    if total_km is not None:
+        parts.append(f"{total_km} km")
+    if avg_hrv is not None:
+        parts.append(f"HRV {avg_hrv}")
+    if rest_days is not None:
+        parts.append(f"{rest_days} rest day{'s' if rest_days != 1 else ''}")
+    message = " · ".join(parts) if parts else "Keep logging data"
+
+    return {
+        "ctl_change": ctl_change,
+        "total_km": total_km,
+        "avg_hrv": avg_hrv,
+        "rest_days": rest_days,
+        "tsb_trend": tsb_trend,
+        "message": message,
+    }
+
+
+def calculate_goal_adherence(weekly_km_target: float, snapshot_rows: list[tuple]) -> dict:
+    """Calculate adherence to a weekly km goal over the last 8 weeks.
+
+    snapshot_rows columns: recorded_at (ISO str), week_0_km
+    Returns per-week achieved/target and overall adherence %.
+    """
+    from datetime import datetime, timedelta
+
+    if not snapshot_rows:
+        return {
+            "target_km": weekly_km_target,
+            "overall_pct": None,
+            "streak": 0,
+            "weeks": [],
+            "message": "No data available",
+        }
+
+    # Group snapshots by ISO week (Monday-based)
+    week_data: dict[str, list[float]] = {}
+    for row in snapshot_rows:
+        recorded_at_str, week_km = row[0], row[1]
+        if week_km is None:
+            continue
+        try:
+            dt = datetime.fromisoformat(recorded_at_str)
+        except ValueError:
+            continue
+        # ISO week start (Monday)
+        week_start = (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
+        week_data.setdefault(week_start, []).append(week_km)
+
+    # Take the max week_0_km per week (most recent fetch that week is most accurate)
+    weeks_sorted = sorted(week_data.keys(), reverse=True)[:8]
+
+    week_results = []
+    for ws in weeks_sorted:
+        actual_km = max(week_data[ws])
+        achieved = actual_km >= weekly_km_target
+        week_results.append(
+            {
+                "week_start": ws,
+                "planned_km": weekly_km_target,
+                "actual_km": round(actual_km, 1),
+                "achieved": achieved,
+            }
+        )
+
+    if not week_results:
+        return {
+            "target_km": weekly_km_target,
+            "overall_pct": None,
+            "streak": 0,
+            "weeks": [],
+            "message": "Not enough weekly data",
+        }
+
+    achieved_count = sum(1 for w in week_results if w["achieved"])
+    overall_pct = round(achieved_count / len(week_results) * 100)
+
+    # Current streak (consecutive achieved weeks from most recent)
+    streak = 0
+    for w in week_results:
+        if w["achieved"]:
+            streak += 1
+        else:
+            break
+
+    return {
+        "target_km": weekly_km_target,
+        "overall_pct": overall_pct,
+        "streak": streak,
+        "weeks": week_results,
+        "message": f"Hit goal {achieved_count}/{len(week_results)} weeks ({overall_pct}%)",
+    }
 
 
 def calculate_injury_risk(rows: list[tuple]) -> dict:

@@ -66,6 +66,10 @@ SNAPSHOT_COLUMNS = [
     "weather_humidity",
     "weather_wind_speed",
     "weather_type",
+    "strava_weekly_km",
+    "strava_total_km",
+    "strava_run_count",
+    "strava_ytd_km",
 ]
 
 # Schema migrations - columns added over time
@@ -111,7 +115,34 @@ MIGRATIONS = [
     ("weather_humidity", "INTEGER"),
     ("weather_wind_speed", "REAL"),
     ("weather_type", "TEXT"),
+    # Strava
+    ("strava_weekly_km", "REAL"),
+    ("strava_total_km", "REAL"),
+    ("strava_run_count", "INTEGER"),
+    ("strava_ytd_km", "REAL"),
 ]
+
+CREATE_PERSONAL_RECORDS_TABLE = """
+    CREATE TABLE IF NOT EXISTS personal_records (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        detected_at     TEXT NOT NULL,
+        distance_label  TEXT NOT NULL UNIQUE,
+        distance_m      INTEGER NOT NULL,
+        time_secs       REAL NOT NULL,
+        pace_str        TEXT NOT NULL,
+        activity_date   TEXT NOT NULL,
+        activity_id     TEXT
+    )
+"""
+
+CREATE_TRAINING_NOTES_TABLE = """
+    CREATE TABLE IF NOT EXISTS training_notes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at  TEXT NOT NULL,
+        note_date   TEXT NOT NULL,
+        content     TEXT NOT NULL
+    )
+"""
 
 CREATE_GOALS_TABLE = """
     CREATE TABLE IF NOT EXISTS goals (
@@ -190,6 +221,10 @@ CREATE_SNAPSHOTS_TABLE = """
         weather_humidity       INTEGER,
         weather_wind_speed     REAL,
         weather_type           TEXT,
+        strava_weekly_km       REAL,
+        strava_total_km        REAL,
+        strava_run_count       INTEGER,
+        strava_ytd_km          REAL,
         intervals_json   TEXT,
         smashrun_json    TEXT
     )
@@ -213,6 +248,7 @@ INSERT_SNAPSHOT = """
         longest_streak, longest_streak_date, longest_break_days, longest_break_date,
         avg_days_run_per_week, days_run_am, days_run_pm, days_run_both, most_often_run_day,
         weather_temp, weather_temp_feels_like, weather_humidity, weather_wind_speed, weather_type,
+        strava_weekly_km, strava_total_km, strava_run_count, strava_ytd_km,
         intervals_json, smashrun_json
     ) VALUES (
         :recorded_at,
@@ -232,6 +268,7 @@ INSERT_SNAPSHOT = """
         :avg_days_run_per_week, :days_run_am, :days_run_pm, :days_run_both, :most_often_run_day,
         :weather_temp, :weather_temp_feels_like, :weather_humidity,
         :weather_wind_speed, :weather_type,
+        :strava_weekly_km, :strava_total_km, :strava_run_count, :strava_ytd_km,
         :intervals_json, :smashrun_json
     )
 """

@@ -7,7 +7,9 @@ from pathlib import Path
 
 from .schema import (
     CREATE_GOALS_TABLE,
+    CREATE_PERSONAL_RECORDS_TABLE,
     CREATE_SNAPSHOTS_TABLE,
+    CREATE_TRAINING_NOTES_TABLE,
     INSERT_SNAPSHOT,
     MIGRATIONS,
     SNAPSHOT_COLUMNS,
@@ -41,6 +43,8 @@ class Database:
             # Create tables
             conn.execute(CREATE_GOALS_TABLE)
             conn.execute(CREATE_SNAPSHOTS_TABLE)
+            conn.execute(CREATE_PERSONAL_RECORDS_TABLE)
+            conn.execute(CREATE_TRAINING_NOTES_TABLE)
 
             # Apply migrations
             for col, typ in MIGRATIONS:
@@ -130,6 +134,99 @@ class Database:
         """Deactivate a goal."""
         with self.connection() as conn:
             conn.execute("UPDATE goals SET is_active = 0 WHERE id = ?", (goal_id,))
+
+    # --- Personal Records ---
+
+    def get_personal_records(self) -> list[sqlite3.Row]:
+        """Get all personal records ordered by distance."""
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM personal_records ORDER BY distance_m ASC"
+            ).fetchall()
+
+    def upsert_record_if_pr(
+        self,
+        distance_label: str,
+        distance_m: int,
+        time_secs: float,
+        pace_str: str,
+        activity_date: str,
+        activity_id: str | None = None,
+    ) -> bool:
+        """Insert or update a personal record if the new time is faster.
+
+        Returns True if a new PR was set.
+        """
+        from datetime import datetime
+
+        with self.connection() as conn:
+            existing = conn.execute(
+                "SELECT id, time_secs FROM personal_records WHERE distance_label = ?",
+                (distance_label,),
+            ).fetchone()
+
+            if existing is None:
+                conn.execute(
+                    """INSERT INTO personal_records
+                       (detected_at, distance_label, distance_m,
+                        time_secs, pace_str, activity_date, activity_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        datetime.now().isoformat(),
+                        distance_label,
+                        distance_m,
+                        time_secs,
+                        pace_str,
+                        activity_date,
+                        activity_id,
+                    ),
+                )
+                return True
+
+            if time_secs < existing[1]:
+                conn.execute(
+                    """UPDATE personal_records
+                       SET detected_at=?, time_secs=?, pace_str=?, activity_date=?, activity_id=?
+                       WHERE distance_label=?""",
+                    (
+                        datetime.now().isoformat(),
+                        time_secs,
+                        pace_str,
+                        activity_date,
+                        activity_id,
+                        distance_label,
+                    ),
+                )
+                return True
+
+        return False
+
+    # --- Training Notes ---
+
+    def get_notes(self, limit: int = 50) -> list[sqlite3.Row]:
+        """Get training notes, most recent first."""
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM training_notes ORDER BY note_date DESC, created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+    def create_note(self, note_date: str, content: str) -> None:
+        """Create a new training note."""
+        from datetime import datetime
+
+        with self.connection() as conn:
+            conn.execute(
+                "INSERT INTO training_notes (created_at, note_date, content) VALUES (?, ?, ?)",
+                (datetime.now().isoformat(), note_date, content),
+            )
+
+    def delete_note(self, note_id: int) -> None:
+        """Delete a training note."""
+        with self.connection() as conn:
+            conn.execute("DELETE FROM training_notes WHERE id = ?", (note_id,))
 
 
 # Singleton instance — intentionally process-scoped.

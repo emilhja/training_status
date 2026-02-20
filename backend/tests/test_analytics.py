@@ -40,12 +40,15 @@ def test_recommendation_go_for_it():
 
 
 def test_projections():
-    projections = calculate_projections(ctl=50, atl=40, ramp_rate=2)
+    projections, days_to_positive = calculate_projections(ctl=50, atl=40, ramp_rate=2)
     assert len(projections) == 7
 
     # Day 1 should be close to input values
     assert projections[0]["day"] == 1
     assert abs(projections[0]["ctl"] - 50) < 1
+
+    # With CTL=50, ATL=40, TSB=10 (positive already), days_to_positive should be None
+    assert days_to_positive is None
 
 
 def test_injury_risk_insufficient_data():

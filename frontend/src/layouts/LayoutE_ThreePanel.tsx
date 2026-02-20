@@ -30,21 +30,28 @@ import SparklineChart from '../components/features/SparklineChart'
 import InjuryRiskPanel from '../components/features/InjuryRiskPanel'
 import CorrelationInsights from '../components/features/CorrelationInsights'
 import RacePredictor from '../components/features/RacePredictor'
+import WeeklySummary from '../components/features/WeeklySummary'
+import PersonalRecords from '../components/features/PersonalRecords'
+import TrainingLog from '../components/features/TrainingLog'
+import GoalAdherence from '../components/features/GoalAdherence'
+import TsbZonesChart from '../components/charts/TsbZonesChart'
+import DetrainingChart from '../components/charts/DetrainingChart'
 import { useState } from 'react'
 import {
   ctlStatus, atlStatus, tsbStatus, tsbZone, acStatus, sleepStatus, subjectiveStatus,
   fmtSleep, fmt, fmtCadence,
 } from '../utils/metrics'
 
-type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'compact' | 'accordion'
+type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'compact' | 'accordion'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'compact', 'accordion']
+const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'compact', 'accordion']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⊞' },
   { id: 'training', label: 'Training', icon: '▲' },
   { id: 'health', label: 'Health', icon: '♥' },
   { id: 'running', label: 'Running', icon: '👟' },
   { id: 'trends', label: 'Trends', icon: '📈' },
+  { id: 'log', label: 'Log', icon: '📝' },
   { id: 'compact', label: 'Compact View', icon: '⬚' },
   { id: 'accordion', label: 'Accordion View', icon: '☰' },
 ]
@@ -77,17 +84,23 @@ export default function LayoutE_ThreePanel() {
       case 'overview':
         return (
           <div className="space-y-6">
+            {/* Weekly Summary */}
+            <WeeklySummary />
+
             {/* Smart Alerts */}
             <SmartAlerts snapshot={s} />
-            
+
             {/* Injury Risk Assessment */}
             <InjuryRiskPanel />
-            
+
             {/* Recovery Recommendation */}
             <RecoveryRecommendation />
-            
+
             {/* Goal Progress */}
             <GoalProgress snapshot={s} />
+
+            {/* Goal Adherence */}
+            <GoalAdherence />
 
             {/* Key Metrics Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -134,7 +147,14 @@ export default function LayoutE_ThreePanel() {
 
             {/* 7-Day Projections */}
             <ProjectionsChart />
-            
+
+            {/* TSB Training Zones */}
+            {snapshots.length > 0 && (
+              <div className="bg-gray-900 rounded-xl p-4">
+                <TsbZonesChart snapshots={snapshots} />
+              </div>
+            )}
+
             {/* Race Predictor */}
             <RacePredictor />
             
@@ -262,13 +282,23 @@ export default function LayoutE_ThreePanel() {
               </div>
             )}
 
+            {/* Personal Records */}
+            <PersonalRecords />
+
             <div className="bg-gray-900 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Weekly Volume</h3>
               <WeeklyKmChart snapshot={s} />
             </div>
           </div>
         )
-      
+
+      case 'log':
+        return (
+          <div className="space-y-6">
+            <TrainingLog />
+          </div>
+        )
+
       case 'trends':
         return (
           <div className="space-y-6">
@@ -286,9 +316,14 @@ export default function LayoutE_ThreePanel() {
             <div className="bg-gray-900 rounded-xl p-4">
               {snapshots.length > 0 && <Vo2maxChart snapshots={snapshots} />}
             </div>
+
+            {/* Detraining Estimator */}
+            <div className="bg-gray-900 rounded-xl p-4">
+              <DetrainingChart />
+            </div>
           </div>
         )
-      
+
       case 'compact':
         return <LayoutB_CompactDashboard />
       

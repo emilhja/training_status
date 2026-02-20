@@ -7,6 +7,56 @@ import requests
 
 from ..config import Settings
 
+# Standard race distances for PR detection: (label, target_meters)
+_PR_DISTANCES = [
+    ("800m", 800),
+    ("1 Mile", 1609),
+    ("5K", 5000),
+    ("10K", 10000),
+    ("Half Marathon", 21097),
+    ("Marathon", 42195),
+]
+_PR_TOLERANCE = 0.08  # ±8% distance tolerance
+
+
+def extract_pr_candidates(activities: list[dict]) -> list[dict]:
+    """Find run activities that match standard race distances (±8%).
+
+    Returns a list of dicts with keys: distance_label, distance_m, time_secs,
+    pace_str, activity_date, activity_id.
+    """
+    candidates = []
+    for act in activities:
+        if act.get("type", "").lower() not in ("run", "virtualrun", "treadmill"):
+            continue
+        distance_m = act.get("distance")
+        moving_time = act.get("moving_time") or act.get("elapsed_time")
+        if not distance_m or not moving_time or moving_time <= 0:
+            continue
+
+        activity_date = str(act.get("start_date_local", ""))[:10]
+        activity_id = str(act.get("id", ""))
+
+        for label, target_m in _PR_DISTANCES:
+            if abs(distance_m - target_m) / target_m <= _PR_TOLERANCE:
+                pace_sec_km = (moving_time / distance_m) * 1000
+                pace_min = int(pace_sec_km // 60)
+                pace_sec_part = int(pace_sec_km % 60)
+                pace_str = f"{pace_min}:{pace_sec_part:02d}/km"
+                candidates.append(
+                    {
+                        "distance_label": label,
+                        "distance_m": target_m,
+                        "time_secs": float(moving_time),
+                        "pace_str": pace_str,
+                        "activity_date": activity_date,
+                        "activity_id": activity_id,
+                    }
+                )
+                break  # each activity matches at most one standard distance
+
+    return candidates
+
 
 class IntervalsClient:
     """Client for Intervals.icu API."""
@@ -169,6 +219,9 @@ class IntervalsClient:
             }
 
         raw["activities"] = acts
+        # Check for personal records in fetched activities
+        raw["pr_candidates"] = extract_pr_candidates(acts if isinstance(acts, list) else [])
+
         result: dict[str, Any] = {
             "rest_days": None,
             "monotony": None,

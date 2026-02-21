@@ -33,7 +33,9 @@ training_status/
 │   ├── API_FIELDS.md
 │   └── TODO.md
 ├── requirements.txt      # Python dependencies
-├── start.sh             # Start the application
+├── start.sh             # Dev mode (hot reload)
+├── start-prod.sh        # Production mode (LAN accessible)
+├── setup-both.sh        # Dev + prod simultaneously
 └── README.md
 ```
 
@@ -117,13 +119,21 @@ cp .env.example .env
 
 Starts the backend on [http://localhost:8000](http://localhost:8000) with `--reload` and the Vite frontend on [http://localhost:5173](http://localhost:5173).
 
-### Web dashboard (production)
+### Production mode (LAN accessible)
 
 ```bash
-./start.sh --prod
+./start-prod.sh
 ```
 
-Builds the frontend if needed, then serves the API + SPA from a single uvicorn process on [http://localhost:8000](http://localhost:8000).
+Builds the frontend if needed, then serves the API + SPA from a single uvicorn process on `0.0.0.0:8000`. Access from your phone via `http://<LAN-IP>:8000`.
+
+### Both simultaneously (dev + phone testing)
+
+```bash
+./setup-both.sh
+```
+
+Runs dev mode (backend :8000 + Vite :5173) and a separate prod server on :8080 accessible from the local network. Useful for developing on your computer while testing on your phone at the same time.
 
 ### CLI only (no web)
 

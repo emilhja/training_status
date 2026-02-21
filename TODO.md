@@ -2,12 +2,12 @@
 
 ## Planned Features (Priority Order)
 
-### 5. PWA (Progressive Web App)
-- [ ] Add service worker for offline mode
-- [ ] Create manifest.json for installability
-- [ ] Implement background sync
-- [ ] Add push notifications for "Time to check in" reminders
-- [ ] Caching strategy for last sync data
+### ~~5. PWA (Progressive Web App)~~ ✅
+- [x] Add service worker for offline mode
+- [x] Create manifest.json for installability
+- [x] Implement background sync (retry POST /api/fetch when back online)
+- [x] Add daily reminder notifications (client-side, configurable in Settings)
+- [x] Caching strategy for last sync data (network-first API, cache-first static)
 
 ### 6. Voice Commands
 - [ ] Google Assistant integration

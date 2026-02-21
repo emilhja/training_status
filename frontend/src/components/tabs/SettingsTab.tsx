@@ -18,6 +18,100 @@ interface EditState {
   value: string
 }
 
+function sendReminderSettings(enabled: boolean, time: string) {
+  navigator.serviceWorker?.ready.then(reg => {
+    reg.active?.postMessage({ type: 'REMINDER_SETTINGS', enabled, time })
+  })
+}
+
+function ReminderSettings() {
+  const [enabled, setEnabled] = useState(() => localStorage.getItem('reminder_enabled') === 'true')
+  const [time, setTime] = useState(() => localStorage.getItem('reminder_time') || '07:00')
+  const [permission, setPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  )
+
+  // Sync settings to SW on mount
+  useEffect(() => {
+    if (enabled && permission === 'granted') {
+      sendReminderSettings(true, time)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleToggle() {
+    if (!enabled) {
+      // Turning on — request permission first
+      if (typeof Notification === 'undefined') return
+      const perm = await Notification.requestPermission()
+      setPermission(perm)
+      if (perm !== 'granted') return
+
+      setEnabled(true)
+      localStorage.setItem('reminder_enabled', 'true')
+      sendReminderSettings(true, time)
+    } else {
+      setEnabled(false)
+      localStorage.setItem('reminder_enabled', 'false')
+      sendReminderSettings(false, time)
+    }
+  }
+
+  function handleTimeChange(newTime: string) {
+    setTime(newTime)
+    localStorage.setItem('reminder_time', newTime)
+    if (enabled) sendReminderSettings(true, newTime)
+  }
+
+  return (
+    <>
+      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">Daily Reminder</h2>
+      <div className="bg-gray-900 rounded-xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-200">Check-in reminder</p>
+            <p className="text-xs text-gray-500">Get a notification to review your training metrics</p>
+          </div>
+          <button
+            onClick={handleToggle}
+            className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-700'}`}
+          >
+            <span className={`block w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {enabled && (
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-400">Remind at</label>
+            <input
+              type="time"
+              value={time}
+              onChange={e => handleTimeChange(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-100
+                         focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        )}
+
+        {permission === 'denied' && (
+          <p className="text-xs text-red-400">
+            Notifications are blocked. Enable them in your browser settings for this site.
+          </p>
+        )}
+
+        {typeof Notification === 'undefined' && (
+          <p className="text-xs text-gray-500">
+            Notifications are not supported in this browser.
+          </p>
+        )}
+
+        <p className="text-xs text-gray-600">
+          Reminders work while the browser is open. For mobile, install this app (Add to Home Screen) for best results.
+        </p>
+      </div>
+    </>
+  )
+}
+
 export default function SettingsTab() {
   const [goals, setGoals]     = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
@@ -157,6 +251,11 @@ export default function SettingsTab() {
           })}
         </div>
       )}
+
+      {/* Daily Reminder */}
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <ReminderSettings />
+      </div>
 
       {/* Dashboard Layout */}
       <div className="mt-10 border-t border-gray-800 pt-6">

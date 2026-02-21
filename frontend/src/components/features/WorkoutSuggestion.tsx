@@ -20,7 +20,7 @@ export default function WorkoutSuggestion() {
     green: 'text-green-400', blue: 'text-blue-400',
   }
   const typeIcons: Record<string, string> = {
-    rest: '🛌', easy: '🚶', long: '🏃', tempo: '⚡', interval: '🔥',
+    rest: '🛌', done: '✅', easy: '🚶', long: '🏃', tempo: '⚡', interval: '🔥',
   }
 
   return (

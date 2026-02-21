@@ -623,6 +623,12 @@ def suggest_workout(
     week_change_pct: float | None,
 ) -> dict:
     """Rule-based workout suggestion for today."""
+    if rest_days is not None and rest_days == 0:
+        return {
+            "type": "done", "title": "You Already Ran Today",
+            "description": "Nice work! Consider resting or doing light mobility/stretching.",
+            "duration_min": 0, "intensity": "none", "color": "green",
+        }
     if tsb is not None and tsb < -20:
         return {
             "type": "rest", "title": "Rest Day",

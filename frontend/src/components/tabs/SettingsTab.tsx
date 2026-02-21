@@ -73,9 +73,9 @@ function ReminderSettings() {
           </div>
           <button
             onClick={handleToggle}
-            className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-700'}`}
+            className={`relative w-14 h-8 rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-700'}`}
           >
-            <span className={`block w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            <span className={`block w-5 h-5 bg-white rounded-full absolute top-1.5 transition-transform ${enabled ? 'translate-x-7' : 'translate-x-1'}`} />
           </button>
         </div>
 
@@ -86,7 +86,7 @@ function ReminderSettings() {
               type="time"
               value={time}
               onChange={e => handleTimeChange(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-100
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100
                          focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -226,7 +226,7 @@ export default function SettingsTab() {
                       onChange={e => setEdit({ type, value: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleSave(type, edit.value)}
                       placeholder="e.g. 50"
-                      className="w-28 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-100
+                      className="w-28 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100
                                  focus:outline-none focus:border-blue-500"
                       autoFocus
                     />
@@ -234,13 +234,13 @@ export default function SettingsTab() {
                     <button
                       onClick={() => handleSave(type, edit.value)}
                       disabled={saving === type || !edit.value}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
                     >
                       {saving === type ? 'Saving…' : 'Save'}
                     </button>
                     <button
                       onClick={() => setEdit(null)}
-                      className="px-3 py-1.5 text-gray-500 hover:text-gray-300 text-sm transition-colors"
+                      className="px-3 py-2 text-gray-500 hover:text-gray-300 text-sm transition-colors"
                     >
                       Cancel
                     </button>

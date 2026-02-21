@@ -35,7 +35,7 @@ training_status/
 ├── requirements.txt      # Python dependencies
 ├── start.sh             # Dev mode (hot reload)
 ├── start-prod.sh        # Production mode (LAN accessible)
-├── setup-both.sh        # Dev + prod simultaneously
+├── start-both.sh        # Dev + prod simultaneously
 └── README.md
 ```
 
@@ -130,10 +130,39 @@ Builds the frontend if needed, then serves the API + SPA from a single uvicorn p
 ### Both simultaneously (dev + phone testing)
 
 ```bash
-./setup-both.sh
+./start-both.sh
 ```
 
 Runs dev mode (backend :8000 + Vite :5173) and a separate prod server on :8080 accessible from the local network. Useful for developing on your computer while testing on your phone at the same time.
+
+### Mobile / PWA install
+
+The app is a Progressive Web App that opens as a standalone app (no browser chrome). Chrome and Safari both require **HTTPS** for standalone mode — a plain `http://` shortcut just opens in the browser.
+
+#### One-time setup: HTTPS on LAN
+
+Certificates are already generated in `certs/` using [mkcert](https://github.com/FiloSottile/mkcert). The start scripts auto-detect and use them.
+
+To trust the certificate on your **Android phone** (do this once):
+
+1. On your computer, find the CA file:
+   ```
+   ~/.local/share/mkcert/rootCA.pem
+   ```
+2. Transfer it to your phone (AirDrop, email, USB, or `python3 -m http.server` in that folder)
+3. On Android: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate** → select `rootCA.pem`
+4. Accept the warning and install
+
+#### Add to home screen
+
+1. Start the server: `./start-prod.sh` or `./start-both.sh`
+2. Open `https://<LAN-IP>:8000` (or `:8080`) in Chrome on your phone
+3. Tap the **three-dot menu** (⋮) → **Add to Home screen** (or **Install app**)
+4. Tap **Add**
+
+**iPhone (Safari):** Same CA install process via Settings → General → VPN & Device Management. Then open in Safari → Share → Add to Home Screen.
+
+Once installed it opens fullscreen with no browser chrome, caches assets for fast loads, and syncs in the background.
 
 ### CLI only (no web)
 

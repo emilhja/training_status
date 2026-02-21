@@ -74,6 +74,7 @@ export default function LayoutE_ThreePanel() {
   const { view } = useParams<{ view: string }>()
   const navigate = useNavigate()
   const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   async function handleRefresh() {
@@ -98,7 +99,17 @@ export default function LayoutE_ThreePanel() {
 
   const activeView = (view as MainView) || 'overview'
 
-  if (loading) return <p className="p-6 text-gray-500">Loading…</p>
+  // Close mobile nav drawer on navigation
+  useEffect(() => { setMobileNavOpen(false) }, [activeView])
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <svg className="w-8 h-8 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+    </div>
+  )
   if (error)   return <p className="p-6 text-red-400">Error: {error}</p>
   if (!s)      return <p className="p-6 text-gray-500">No data yet. Run a fetch first.</p>
 
@@ -118,7 +129,7 @@ export default function LayoutE_ThreePanel() {
           goal_progress: <GoalProgress snapshot={s} />,
           goal_adherence: <GoalAdherence />,
           metric_cards: (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} />
               <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} />
               <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" />
@@ -196,7 +207,7 @@ export default function LayoutE_ThreePanel() {
             {(s.elevation_gain_m !== null || s.avg_cadence !== null || s.icu_rpe !== null) && (
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Latest Activity</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {s.elevation_gain_m !== null && <MetricCard label="Elevation" value={fmt(s.elevation_gain_m)} unit="m" />}
                   {s.avg_cadence !== null && <MetricCard label="Cadence" value={fmtCadence(s.avg_cadence)} unit="spm" />}
                   {s.max_hr !== null && <MetricCard label="Max HR" value={s.max_hr} unit="bpm" />}
@@ -239,7 +250,7 @@ export default function LayoutE_ThreePanel() {
             {(s.stress !== null || s.readiness !== null || s.weight !== null || s.body_fat !== null) && (
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Wellness (Garmin/Intervals)</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {s.stress !== null && <MetricCard label="Stress" value={s.stress} unit="/100" />}
                   {s.readiness !== null && <MetricCard label="Readiness" value={s.readiness} unit="/100" />}
                   {s.weight !== null && <MetricCard label="Weight" value={fmt(s.weight)} unit="kg" />}
@@ -251,7 +262,7 @@ export default function LayoutE_ThreePanel() {
             {(s.mood !== null || s.motivation !== null || s.fatigue !== null || s.soreness !== null) && (
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Subjective Wellness</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {s.mood !== null && <MetricCard label="Mood" value={s.mood} unit="/5" status={subjectiveStatus(s.mood)} />}
                   {s.motivation !== null && <MetricCard label="Motivation" value={s.motivation} unit="/5" status={subjectiveStatus(s.motivation)} />}
                   {s.fatigue !== null && <MetricCard label="Fatigue" value={s.fatigue} unit="/5" status={subjectiveStatus(s.fatigue) === 'good' ? 'bad' : subjectiveStatus(s.fatigue) === 'bad' ? 'good' : 'ok'} />}
@@ -309,7 +320,7 @@ export default function LayoutE_ThreePanel() {
             {(s.longest_streak !== null || s.avg_days_run_per_week !== null || s.most_often_run_day !== null) && (
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Running Patterns</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {s.longest_streak !== null && <MetricCard label="Longest Streak" value={s.longest_streak} unit="days" />}
                   {s.longest_break_days !== null && <MetricCard label="Longest Break" value={s.longest_break_days} unit="days" />}
                   {s.avg_days_run_per_week !== null && <MetricCard label="Avg Days/Week" value={fmt(s.avg_days_run_per_week, 1)} />}
@@ -381,6 +392,15 @@ export default function LayoutE_ThreePanel() {
       {/* Header */}
       <header className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="md:hidden p-2 -ml-1 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            aria-label="Open navigation"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
           <h1 className="text-base font-semibold tracking-tight">Training Status</h1>
           <LastUpdated timestamp={s.recorded_at} />
         </div>
@@ -408,7 +428,7 @@ export default function LayoutE_ThreePanel() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors"
+            className="px-3 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors"
           >
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -417,10 +437,35 @@ export default function LayoutE_ThreePanel() {
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Mobile backdrop */}
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+
         {/* Left Sidebar */}
-        <aside className={`${leftCollapsed ? 'w-14' : 'w-56'} bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-200`}>
+        <aside className={`
+          fixed inset-y-0 left-0 z-50 flex flex-col bg-gray-900 border-r border-gray-800
+          transition-transform duration-200
+          md:relative md:inset-auto md:z-auto md:translate-x-0
+          ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${leftCollapsed ? 'w-14' : 'w-56'}
+        `}>
+          {/* Mobile close button */}
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            className="md:hidden absolute top-3 right-3 p-1 rounded text-gray-500 hover:text-gray-300"
+            aria-label="Close navigation"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+
           {/* Collapse Toggle */}
-          <button 
+          <button
             onClick={() => setLeftCollapsed(!leftCollapsed)}
             className="p-3 border-b border-gray-800 text-gray-500 hover:text-gray-300 flex items-center justify-center"
             title={leftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -436,7 +481,7 @@ export default function LayoutE_ThreePanel() {
               <Link
                 key={item.id}
                 to={`/${item.id}`}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium transition-colors
+                className={`w-full flex items-center gap-2 px-2 py-3 rounded text-sm font-medium transition-colors
                   ${activeView === item.id
                     ? 'bg-blue-600/20 text-blue-400'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
@@ -454,7 +499,7 @@ export default function LayoutE_ThreePanel() {
             <div className="p-3 border-t border-gray-800 space-y-4">
               {/* Trend Indicators */}
               <div>
-                <p className="text-[10px] uppercase text-gray-500 tracking-wider mb-2">Trends (vs last)</p>
+                <p className="text-xs uppercase text-gray-500 tracking-wider mb-2">Trends (vs last)</p>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-400">CTL</span>
@@ -488,7 +533,7 @@ export default function LayoutE_ThreePanel() {
 
               {/* Weekly Volume Comparison */}
               <div>
-                <p className="text-[10px] uppercase text-gray-500 tracking-wider mb-2">Weekly Volume</p>
+                <p className="text-xs uppercase text-gray-500 tracking-wider mb-2">Weekly Volume</p>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">This week</span>
@@ -512,7 +557,7 @@ export default function LayoutE_ThreePanel() {
 
               {/* 4-Week Average */}
               <div>
-                <p className="text-[10px] uppercase text-gray-500 tracking-wider mb-1">4-Week Avg</p>
+                <p className="text-xs uppercase text-gray-500 tracking-wider mb-1">4-Week Avg</p>
                 <p className="text-lg font-semibold text-gray-200">
                   {fmt(((s.week_1_km || 0) + (s.week_2_km || 0) + (s.week_3_km || 0) + (s.week_4_km || 0)) / 4)}
                   <span className="text-sm text-gray-500 ml-1">km/wk</span>
@@ -522,7 +567,7 @@ export default function LayoutE_ThreePanel() {
               {/* Recent History Mini-List */}
               {snapshots.length > 1 && (
                 <div>
-                  <p className="text-[10px] uppercase text-gray-500 tracking-wider mb-2">Recent Snapshots</p>
+                  <p className="text-xs uppercase text-gray-500 tracking-wider mb-2">Recent Snapshots</p>
                   <div className="space-y-1">
                     {snapshots.slice(-3).reverse().map((snap, idx) => (
                       <div key={snap.id} className="flex items-center justify-between text-xs py-1 border-b border-gray-800/50 last:border-0">
@@ -551,7 +596,7 @@ export default function LayoutE_ThreePanel() {
             renderMainContent()
           ) : (
             // Standard layoutE view with padding and max-width
-            <div className="max-w-5xl mx-auto p-6">
+            <div className="max-w-5xl mx-auto p-6 pb-safe">
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-gray-200">
                   {menuItems.find(m => m.id === activeView)?.label}
@@ -573,18 +618,18 @@ export default function LayoutE_ThreePanel() {
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Stats</h3>
               <div className="space-y-3">
                 <div className="bg-gray-800/50 rounded-lg p-3">
-                  <p className="text-[10px] text-gray-500 uppercase">Form (TSB)</p>
+                  <p className="text-xs text-gray-500 uppercase">Form (TSB)</p>
                   <p className={`text-xl font-semibold ${tsbStatus(s.tsb) === 'good' ? 'text-green-400' : tsbStatus(s.tsb) === 'bad' ? 'text-red-400' : 'text-gray-200'}`}>
                     {fmt(s.tsb)}
                   </p>
                   <p className="text-xs text-gray-500">{tsbZone(s.tsb)}</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-3">
-                  <p className="text-[10px] text-gray-500 uppercase">Rest Days</p>
+                  <p className="text-xs text-gray-500 uppercase">Rest Days</p>
                   <p className="text-xl font-semibold text-gray-200">{s.rest_days ?? '—'}</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-3">
-                  <p className="text-[10px] text-gray-500 uppercase">This Week</p>
+                  <p className="text-xs text-gray-500 uppercase">This Week</p>
                   <p className="text-xl font-semibold text-gray-200">{fmt(s.week_0_km)} <span className="text-sm text-gray-500">km</span></p>
                 </div>
               </div>
@@ -650,15 +695,15 @@ export default function LayoutE_ThreePanel() {
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">7-Day Trends</h3>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">CTL</p>
+                    <p className="text-xs text-gray-500 mb-1">CTL</p>
                     <SparklineChart snapshots={snapshots} dataKey="ctl" color="#22c55e" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">HRV</p>
+                    <p className="text-xs text-gray-500 mb-1">HRV</p>
                     <SparklineChart snapshots={snapshots} dataKey="hrv" color="#3b82f6" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">Sleep Score</p>
+                    <p className="text-xs text-gray-500 mb-1">Sleep Score</p>
                     <SparklineChart snapshots={snapshots} dataKey="sleep_score" color="#a855f7" />
                   </div>
                 </div>

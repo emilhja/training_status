@@ -957,11 +957,19 @@ if DIST_DIR.exists():
 
     @app.get("/manifest.json")
     async def manifest() -> FileResponse:
-        return FileResponse(str(DIST_DIR / "manifest.json"))
+        return FileResponse(str(DIST_DIR / "manifest.json"), media_type="application/manifest+json")
 
     @app.get("/sw.js")
     async def service_worker() -> FileResponse:
-        return FileResponse(str(DIST_DIR / "sw.js"))
+        return FileResponse(str(DIST_DIR / "sw.js"), media_type="application/javascript")
+
+    @app.get("/icon-192x192.png")
+    async def icon_192() -> FileResponse:
+        return FileResponse(str(DIST_DIR / "icon-192x192.png"), media_type="image/png")
+
+    @app.get("/icon-512x512.png")
+    async def icon_512() -> FileResponse:
+        return FileResponse(str(DIST_DIR / "icon-512x512.png"), media_type="image/png")
 
     # Serve index.html for root and all SPA routes
     @app.get("/")

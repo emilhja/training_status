@@ -25,3 +25,8 @@
   --color-gray-200: oklch(0.18 0.028 258); /* was: bright      → now: very dark */
   --color-gray-100: oklch(0.12 0.028 262); /* was: brightest   → now: near-black */
 }
+
+/* Safe area insets for notched / home-indicator devices (PWA standalone mode) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}

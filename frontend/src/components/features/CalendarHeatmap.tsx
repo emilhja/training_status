@@ -63,33 +63,35 @@ export default function CalendarHeatmap({ snapshots }: Props) {
     <div className="bg-gray-900 rounded-xl p-4">
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Activity Heatmap (12 weeks)</h3>
       
-      <div className="flex gap-1">
-        {/* Day labels */}
-        <div className="flex flex-col gap-1 mr-2">
-          {dayLabels.map((d, i) => (
-            <div key={i} className="w-4 h-4 flex items-center justify-center text-[10px] text-gray-500">
-              {d}
-            </div>
-          ))}
-        </div>
-        
-        {/* Heatmap grid */}
-        <div className="flex gap-1">
-          {heatmapData.weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-1">
-              {week.map((date, di) => {
-                const intensity = getIntensity(date)
-                const isToday = date === new Date().toISOString().slice(0, 10)
-                return (
-                  <div
-                    key={di}
-                    className={`w-4 h-4 rounded-sm ${intensityColors[intensity]} ${isToday ? 'ring-2 ring-blue-400' : ''}`}
-                    title={`${date}: ${heatmapData.byDate.get(date) || 'No data'}`}
-                  />
-                )
-              })}
-            </div>
-          ))}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="flex gap-1 min-w-max">
+          {/* Day labels */}
+          <div className="flex flex-col gap-1 mr-2">
+            {dayLabels.map((d, i) => (
+              <div key={i} className="w-4 h-4 flex items-center justify-center text-xs text-gray-500">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Heatmap grid */}
+          <div className="flex gap-1">
+            {heatmapData.weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-1">
+                {week.map((date, di) => {
+                  const intensity = getIntensity(date)
+                  const isToday = date === new Date().toISOString().slice(0, 10)
+                  return (
+                    <div
+                      key={di}
+                      className={`w-4 h-4 rounded-sm ${intensityColors[intensity]} ${isToday ? 'ring-2 ring-blue-400' : ''}`}
+                      title={`${date}: ${heatmapData.byDate.get(date) || 'No data'}`}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       

@@ -6,8 +6,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .schema import (
+    CREATE_ANNOTATIONS_TABLE,
+    CREATE_GEAR_TABLE,
     CREATE_GOALS_TABLE,
+    CREATE_HEALTH_EVENTS_TABLE,
     CREATE_PERSONAL_RECORDS_TABLE,
+    CREATE_SHARED_LINKS_TABLE,
     CREATE_SNAPSHOTS_TABLE,
     CREATE_TRAINING_NOTES_TABLE,
     INSERT_SNAPSHOT,
@@ -45,6 +49,10 @@ class Database:
             conn.execute(CREATE_SNAPSHOTS_TABLE)
             conn.execute(CREATE_PERSONAL_RECORDS_TABLE)
             conn.execute(CREATE_TRAINING_NOTES_TABLE)
+            conn.execute(CREATE_GEAR_TABLE)
+            conn.execute(CREATE_HEALTH_EVENTS_TABLE)
+            conn.execute(CREATE_ANNOTATIONS_TABLE)
+            conn.execute(CREATE_SHARED_LINKS_TABLE)
 
             # Apply migrations
             for col, typ in MIGRATIONS:
@@ -227,6 +235,144 @@ class Database:
         """Delete a training note."""
         with self.connection() as conn:
             conn.execute("DELETE FROM training_notes WHERE id = ?", (note_id,))
+
+    # --- Gear ---
+
+    def get_gear(self, active_only: bool = True) -> list[sqlite3.Row]:
+        """Get gear items."""
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            q = "SELECT * FROM gear WHERE is_active = 1" if active_only else "SELECT * FROM gear"
+            return conn.execute(q + " ORDER BY created_at DESC").fetchall()  # type: ignore[return-value]
+
+    def create_gear(
+        self, name: str, gear_type: str, brand: str | None,
+        purchase_date: str | None, retirement_km: float,
+    ) -> None:
+        from datetime import datetime
+
+        with self.connection() as conn:
+            conn.execute(
+                """INSERT INTO gear (name, gear_type, brand, purchase_date,
+                   retirement_km, accumulated_km, is_active, created_at)
+                   VALUES (?, ?, ?, ?, ?, 0, 1, ?)""",
+                (name, gear_type, brand, purchase_date, retirement_km,
+                 datetime.now().isoformat()),
+            )
+
+    def update_gear(self, gear_id: int, **kwargs: object) -> None:
+        allowed = {"name", "brand", "retirement_km", "accumulated_km", "is_active"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE gear SET {set_clause} WHERE id = ?",
+                (*fields.values(), gear_id),
+            )
+
+    def delete_gear(self, gear_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("UPDATE gear SET is_active = 0 WHERE id = ?", (gear_id,))
+
+    # --- Health Events ---
+
+    def get_health_events(self, limit: int = 50) -> list[sqlite3.Row]:
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM health_events ORDER BY event_date DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+    def create_health_event(
+        self, event_date: str, end_date: str | None, event_type: str,
+        description: str, tags: str | None,
+    ) -> None:
+        from datetime import datetime
+
+        with self.connection() as conn:
+            conn.execute(
+                """INSERT INTO health_events
+                   (event_date, end_date, event_type, description, tags, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (event_date, end_date, event_type, description, tags,
+                 datetime.now().isoformat()),
+            )
+
+    def update_health_event(self, event_id: int, **kwargs: object) -> None:
+        allowed = {"end_date", "description", "tags"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE health_events SET {set_clause} WHERE id = ?",
+                (*fields.values(), event_id),
+            )
+
+    def delete_health_event(self, event_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM health_events WHERE id = ?", (event_id,))
+
+    # --- Annotations ---
+
+    def get_annotations(self, metric: str | None = None, limit: int = 100) -> list[sqlite3.Row]:
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            if metric:
+                return conn.execute(  # type: ignore[return-value]
+                    "SELECT * FROM annotations WHERE metric = ? ORDER BY annotation_date DESC LIMIT ?",
+                    (metric, limit),
+                ).fetchall()
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM annotations ORDER BY annotation_date DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+    def create_annotation(self, annotation_date: str, metric: str, content: str) -> None:
+        from datetime import datetime
+
+        with self.connection() as conn:
+            conn.execute(
+                "INSERT INTO annotations (annotation_date, metric, content, created_at) VALUES (?, ?, ?, ?)",
+                (annotation_date, metric, content, datetime.now().isoformat()),
+            )
+
+    def delete_annotation(self, annotation_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM annotations WHERE id = ?", (annotation_id,))
+
+    # --- Shared Links ---
+
+    def create_shared_link(self, token: str, expires_at: str | None = None) -> None:
+        from datetime import datetime
+
+        with self.connection() as conn:
+            conn.execute(
+                "INSERT INTO shared_links (token, created_at, expires_at, is_active) VALUES (?, ?, ?, 1)",
+                (token, datetime.now().isoformat(), expires_at),
+            )
+
+    def get_shared_link(self, token: str) -> sqlite3.Row | None:
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM shared_links WHERE token = ?", (token,)
+            ).fetchone()
+
+    def get_all_shared_links(self) -> list[sqlite3.Row]:
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM shared_links WHERE is_active = 1 ORDER BY created_at DESC"
+            ).fetchall()
+
+    def deactivate_shared_link(self, token: str) -> None:
+        with self.connection() as conn:
+            conn.execute("UPDATE shared_links SET is_active = 0 WHERE token = ?", (token,))
 
 
 # Singleton instance — intentionally process-scoped.

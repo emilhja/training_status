@@ -244,3 +244,141 @@ export interface StravaStatus {
   configured: boolean
   message: string
 }
+
+// --- New Feature Types ---
+
+export interface ReadinessComponents {
+  tsb: number | null
+  hrv_trend: number | null
+  sleep: number | null
+  fatigue: number | null
+  soreness: number | null
+}
+
+export interface ReadinessScoreData {
+  score: number
+  label: string
+  components: ReadinessComponents
+}
+
+export interface WorkoutSuggestionData {
+  type: string
+  title: string
+  description: string
+  duration_min: number
+  intensity: string
+  color: string
+}
+
+export interface OverloadWeek {
+  label: string
+  current_km: number
+  previous_km: number
+  change_pct: number
+  flagged: boolean
+}
+
+export interface OverloadResponse {
+  weeks: OverloadWeek[]
+  safe: boolean
+  recommendation: string
+}
+
+export interface HrZone {
+  zone: string
+  hr_low: number
+  hr_high: number
+}
+
+export interface PaceZone {
+  zone: string
+  pace_low: string
+  pace_high: string
+  speed_low_ms: number
+  speed_high_ms: number
+}
+
+export interface TrainingZonesData {
+  hr_zones: HrZone[]
+  pace_zones: PaceZone[]
+  data_quality: string
+}
+
+export interface HrDriftPoint {
+  date: string
+  z2_ratio: number
+  easy_pct: number
+}
+
+export interface HrDriftData {
+  points: HrDriftPoint[]
+  assessment: string
+  message: string
+  trend: string
+}
+
+export interface SleepInsight {
+  type: string
+  title: string
+  finding: string
+  recommendation: string
+}
+
+export interface SleepInsightsData {
+  insights: SleepInsight[]
+  data_points: number
+}
+
+export interface TaperWeek {
+  week: number
+  label: string
+  days_to_race: number
+  target_volume_pct: number
+  reduction_pct: number
+  projected_ctl: number
+}
+
+export interface TaperData {
+  race_date: string
+  days_to_race: number | null
+  taper_weeks: number | null
+  current_ctl: number | null
+  model: string | null
+  weeks: TaperWeek[]
+  error: string | null
+}
+
+export interface GearItem {
+  id: number
+  name: string
+  gear_type: string
+  brand: string | null
+  purchase_date: string | null
+  retirement_km: number
+  accumulated_km: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface HealthEvent {
+  id: number
+  event_date: string
+  end_date: string | null
+  event_type: string
+  description: string
+  tags: string | null
+  created_at: string
+}
+
+export interface AnnotationItem {
+  id: number
+  annotation_date: string
+  metric: string
+  content: string
+  created_at: string
+}
+
+export interface DashboardWidget {
+  id: string
+  visible: boolean
+}

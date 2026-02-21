@@ -38,15 +38,25 @@ import GoalAdherence from '../components/features/GoalAdherence'
 import TsbZonesChart from '../components/charts/TsbZonesChart'
 import DetrainingChart from '../components/charts/DetrainingChart'
 import SettingsTab from '../components/tabs/SettingsTab'
+import ReadinessScore from '../components/features/ReadinessScore'
+import WorkoutSuggestion from '../components/features/WorkoutSuggestion'
+import OverloadTracker from '../components/features/OverloadTracker'
+import TrainingZones from '../components/features/TrainingZones'
+import HrDriftAnalysis from '../components/features/HrDriftAnalysis'
+import SleepInsights from '../components/features/SleepInsights'
+import TaperCalculator from '../components/features/TaperCalculator'
+import GearTracker from '../components/features/GearTracker'
+import HealthEventLog from '../components/features/HealthEventLog'
+import { loadDashboardConfig } from '../components/features/DashboardConfig'
 import { useState } from 'react'
 import {
   ctlStatus, atlStatus, tsbStatus, tsbZone, acStatus, sleepStatus, subjectiveStatus,
   fmtSleep, fmt, fmtCadence,
 } from '../utils/metrics'
 
-type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'compact' | 'accordion' | 'settings'
+type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'compact', 'accordion', 'settings']
+const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⊞' },
   { id: 'training', label: 'Training', icon: '▲' },
@@ -54,6 +64,7 @@ const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'running', label: 'Running', icon: '👟' },
   { id: 'trends', label: 'Trends', icon: '📈' },
   { id: 'log', label: 'Log', icon: '📝' },
+  { id: 'gear', label: 'Gear', icon: '🏷' },
   { id: 'compact', label: 'Compact View', icon: '⬚' },
   { id: 'accordion', label: 'Accordion View', icon: '☰' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
@@ -95,54 +106,49 @@ export default function LayoutE_ThreePanel() {
 
   const renderMainContent = () => {
     switch (activeView) {
-      case 'overview':
-        return (
-          <div className="space-y-6">
-            {/* Weekly Summary */}
-            <WeeklySummary />
-
-            {/* Smart Alerts */}
-            <SmartAlerts snapshot={s} />
-
-            {/* Injury Risk Assessment */}
-            <InjuryRiskPanel />
-
-            {/* Recovery Recommendation */}
-            <RecoveryRecommendation />
-
-            {/* Goal Progress */}
-            <GoalProgress snapshot={s} />
-
-            {/* Goal Adherence */}
-            <GoalAdherence />
-
-            {/* Key Metrics Cards */}
+      case 'overview': {
+        const dashConfig = loadDashboardConfig()
+        const widgetMap: Record<string, React.ReactNode> = {
+          readiness: <ReadinessScore />,
+          workout_suggestion: <WorkoutSuggestion />,
+          weekly_summary: <WeeklySummary />,
+          smart_alerts: <SmartAlerts snapshot={s} />,
+          injury_risk: <InjuryRiskPanel />,
+          recovery_recommendation: <RecoveryRecommendation />,
+          goal_progress: <GoalProgress snapshot={s} />,
+          goal_adherence: <GoalAdherence />,
+          metric_cards: (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} />
               <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} />
               <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" />
               <MetricCard label="HRV" value={fmt(s.hrv, 0)} unit="ms" />
             </div>
-            
-            {/* Comparison Row */}
+          ),
+          compare_consistency: (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <CompareMode snapshot={s} />
               <ConsistencyScore />
             </div>
-            
-            {/* Pattern Insights */}
-            <CorrelationInsights />
-
-            {/* Charts */}
+          ),
+          correlation_insights: <CorrelationInsights />,
+          training_load_chart: (
             <div className="bg-gray-900 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Training Load Trend</h3>
               {snapshots.length > 0 && <TrainingLoadChart snapshots={snapshots} />}
             </div>
-
-            {/* Activity Heatmap */}
-            {snapshots.length > 0 && <CalendarHeatmap snapshots={snapshots} />}
+          ),
+          calendar_heatmap: snapshots.length > 0 ? <CalendarHeatmap snapshots={snapshots} /> : null,
+        }
+        return (
+          <div className="space-y-6">
+            {dashConfig.filter(w => w.visible).map(w => {
+              const widget = widgetMap[w.id]
+              return widget ? <div key={w.id}>{widget}</div> : null
+            })}
           </div>
         )
+      }
       
       case 'training':
         return (
@@ -159,6 +165,9 @@ export default function LayoutE_ThreePanel() {
               <MetricCard label="Training Strain" value={s.training_strain ?? '—'} />
             </div>
 
+            {/* Progressive Overload */}
+            <OverloadTracker />
+
             {/* 7-Day Projections */}
             <ProjectionsChart />
 
@@ -171,7 +180,16 @@ export default function LayoutE_ThreePanel() {
 
             {/* Race Predictor */}
             <RacePredictor />
-            
+
+            {/* Taper Calculator */}
+            <TaperCalculator />
+
+            {/* Training Zones */}
+            <TrainingZones />
+
+            {/* HR Drift Analysis */}
+            <HrDriftAnalysis />
+
             {/* Pace Zones */}
             <PaceZonesChart snapshot={s} />
             
@@ -258,9 +276,15 @@ export default function LayoutE_ThreePanel() {
             <div className="bg-gray-900 rounded-xl p-4">
               {snapshots.length > 0 && <Vo2maxChart snapshots={snapshots} />}
             </div>
+
+            {/* Sleep Insights */}
+            <SleepInsights />
+
+            {/* Health Events */}
+            <HealthEventLog />
           </div>
         )
-      
+
       case 'running':
         return (
           <div className="space-y-6">
@@ -305,6 +329,9 @@ export default function LayoutE_ThreePanel() {
             </div>
           </div>
         )
+
+      case 'gear':
+        return <GearTracker />
 
       case 'log':
         return (

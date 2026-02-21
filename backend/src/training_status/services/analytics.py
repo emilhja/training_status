@@ -566,3 +566,362 @@ def calculate_race_predictions(
         )
 
     return predictions
+
+
+def calculate_readiness_score(
+    tsb: float | None,
+    hrv_trend_pct: float | None,
+    sleep_score: float | None,
+    fatigue: int | None,
+    soreness: int | None,
+) -> dict:
+    """Composite training readiness score 0-100.
+
+    Weights: TSB 0.30, HRV trend 0.25, sleep 0.20, fatigue 0.15, soreness 0.10.
+    """
+    # TSB component: clamp [-30, 20] → [0, 100]
+    tsb_norm = max(0.0, min(100.0, (tsb + 30) / 50 * 100)) if tsb is not None else 50.0
+    # HRV trend: +10% → 100, 0% → 70, -20% → 0
+    hrv_norm = max(0.0, min(100.0, 70.0 + hrv_trend_pct * 1.5)) if hrv_trend_pct is not None else 50.0
+    # Sleep score: pass-through 0-100
+    sleep_norm = sleep_score if sleep_score is not None else 50.0
+    # Fatigue (1=best, 5=worst) → 0-100 inverted
+    fatigue_norm = max(0.0, min(100.0, (6 - fatigue) / 5 * 100)) if fatigue is not None else 50.0
+    # Soreness (1=best, 5=worst) → 0-100 inverted
+    soreness_norm = max(0.0, min(100.0, (6 - soreness) / 5 * 100)) if soreness is not None else 50.0
+
+    score = round(
+        tsb_norm * 0.30 + hrv_norm * 0.25 + sleep_norm * 0.20
+        + fatigue_norm * 0.15 + soreness_norm * 0.10
+    )
+
+    label = (
+        "Excellent" if score >= 80
+        else "Good" if score >= 60
+        else "Fair" if score >= 40
+        else "Poor"
+    )
+
+    return {
+        "score": score,
+        "label": label,
+        "components": {
+            "tsb": round(tsb_norm, 1),
+            "hrv_trend": round(hrv_norm, 1),
+            "sleep": round(sleep_norm, 1),
+            "fatigue": round(fatigue_norm, 1),
+            "soreness": round(soreness_norm, 1),
+        },
+    }
+
+
+def suggest_workout(
+    tsb: float | None,
+    sleep_score: float | None,
+    rest_days: int | None,
+    day_of_week: int,
+    week_change_pct: float | None,
+) -> dict:
+    """Rule-based workout suggestion for today."""
+    if tsb is not None and tsb < -20:
+        return {
+            "type": "rest", "title": "Rest Day",
+            "description": "TSB is deeply negative. Full recovery required.",
+            "duration_min": 0, "intensity": "none", "color": "red",
+        }
+    if tsb is not None and tsb < -10:
+        return {
+            "type": "easy", "title": "Easy Recovery Run",
+            "description": "Keep HR in Z1-Z2. Conversational pace only.",
+            "duration_min": 30, "intensity": "low", "color": "blue",
+        }
+    if sleep_score is not None and sleep_score < 60:
+        return {
+            "type": "easy", "title": "Easy Run - Sleep Recovery",
+            "description": f"Sleep score {sleep_score:.0f}/100. Avoid intensity today.",
+            "duration_min": 30, "intensity": "low", "color": "yellow",
+        }
+    if day_of_week in (5, 6) and (tsb is None or tsb >= -5):
+        return {
+            "type": "long", "title": "Long Run",
+            "description": "Weekend long run at comfortable aerobic pace.",
+            "duration_min": 75, "intensity": "medium", "color": "green",
+        }
+    if tsb is not None and 0 <= tsb <= 15:
+        return {
+            "type": "tempo", "title": "Tempo / Threshold Run",
+            "description": "Form is optimal. 20-25 min at threshold pace.",
+            "duration_min": 50, "intensity": "high", "color": "green",
+        }
+    if tsb is not None and tsb > 15:
+        return {
+            "type": "interval", "title": "Interval Session",
+            "description": "Well-rested. 6x1km at 5K pace with 90s recovery.",
+            "duration_min": 55, "intensity": "very_high", "color": "green",
+        }
+    if week_change_pct is not None and week_change_pct > 15:
+        return {
+            "type": "easy", "title": "Moderate Run",
+            "description": "Volume up significantly vs last week. Keep it controlled.",
+            "duration_min": 40, "intensity": "low", "color": "yellow",
+        }
+    return {
+        "type": "easy", "title": "Easy Aerobic Run",
+        "description": "Default aerobic base run. Keep it conversational.",
+        "duration_min": 40, "intensity": "low", "color": "blue",
+    }
+
+
+def calculate_overload(week_rows: list[tuple]) -> dict:
+    """Week-over-week volume change with flag if >10% increase.
+
+    week_rows columns: week_0_km, week_1_km, week_2_km, week_3_km, week_4_km
+    """
+    if not week_rows:
+        return {"weeks": [], "safe": True, "recommendation": "No data"}
+
+    w0, w1, w2, w3, w4 = week_rows[0]
+    pairs = [
+        ("This week vs last", w0, w1),
+        ("W-1 vs W-2", w1, w2),
+        ("W-2 vs W-3", w2, w3),
+        ("W-3 vs W-4", w3, w4),
+    ]
+
+    weeks = []
+    any_flagged = False
+    for label, current, previous in pairs:
+        if current is None or previous is None or previous == 0:
+            continue
+        pct = round((current - previous) / previous * 100, 1)
+        flagged = pct > 10
+        if flagged:
+            any_flagged = True
+        weeks.append({
+            "label": label,
+            "current_km": round(current, 1),
+            "previous_km": round(previous, 1),
+            "change_pct": pct,
+            "flagged": flagged,
+        })
+
+    recommendation = (
+        "Volume jump >10% detected. Increase risk of overuse injury. Consider backing off."
+        if any_flagged
+        else "Volume progression looks safe. Steady build."
+    )
+    return {"weeks": weeks, "safe": not any_flagged, "recommendation": recommendation}
+
+
+def calculate_training_zones(
+    resting_hr: int | None,
+    max_hr: int | None,
+    critical_speed: float | None,
+) -> dict:
+    """Compute HR zones (Karvonen) and pace zones from critical speed."""
+    hr_zones = []
+    if resting_hr is not None and max_hr is not None:
+        hrr = max_hr - resting_hr
+        zone_pcts = [
+            ("Z1 Recovery", 0.50, 0.60),
+            ("Z2 Aerobic", 0.60, 0.70),
+            ("Z3 Tempo", 0.70, 0.80),
+            ("Z4 Threshold", 0.80, 0.90),
+            ("Z5 VO2max", 0.90, 1.00),
+        ]
+        for name, lo, hi in zone_pcts:
+            hr_zones.append({
+                "zone": name,
+                "hr_low": round(resting_hr + hrr * lo),
+                "hr_high": round(resting_hr + hrr * hi),
+            })
+
+    pace_zones = []
+    if critical_speed is not None and critical_speed > 0:
+        zone_multipliers = [
+            ("Z1 Recovery", 0.70, 0.78),
+            ("Z2 Aerobic", 0.79, 0.87),
+            ("Z3 Tempo", 0.88, 0.93),
+            ("Z4 Threshold", 0.94, 1.00),
+            ("Z5 VO2max", 1.01, 1.10),
+            ("Z6 Anaerobic", 1.11, 1.25),
+        ]
+
+        def _pace_str(speed: float) -> str:
+            secs = 1000 / speed
+            return f"{int(secs // 60)}:{int(secs % 60):02d}/km"
+
+        for name, lo_mult, hi_mult in zone_multipliers:
+            speed_lo = critical_speed * lo_mult
+            speed_hi = critical_speed * hi_mult
+            pace_zones.append({
+                "zone": name,
+                "pace_low": _pace_str(speed_hi),
+                "pace_high": _pace_str(speed_lo),
+                "speed_low_ms": round(speed_lo, 2),
+                "speed_high_ms": round(speed_hi, 2),
+            })
+
+    data_quality = (
+        "full" if hr_zones and pace_zones
+        else "hr_only" if hr_zones
+        else "pace_only" if pace_zones
+        else "none"
+    )
+    return {"hr_zones": hr_zones, "pace_zones": pace_zones, "data_quality": data_quality}
+
+
+def calculate_hr_drift(rows: list[tuple]) -> dict:
+    """Analyze HR zone time to detect cardiac drift on easy sessions.
+
+    rows columns: hr_zone_z1_secs, hr_zone_z2_secs, hr_zone_z3_secs,
+                  hr_zone_z4_secs, hr_zone_z5_secs, recorded_at.
+    """
+    points = []
+    for row in rows:
+        z1, z2, z3, z4, z5, recorded_at = row
+        if None in (z1, z2, z3):
+            continue
+        total = (z1 or 0) + (z2 or 0) + (z3 or 0) + (z4 or 0) + (z5 or 0)
+        if total < 600:
+            continue
+        easy_secs = (z1 or 0) + (z2 or 0)
+        easy_pct = easy_secs / total * 100
+        if easy_pct < 70:
+            continue
+        z2_ratio = (z2 or 0) / easy_secs * 100 if easy_secs > 0 else 0
+        points.append({
+            "date": recorded_at[:10] if isinstance(recorded_at, str) else str(recorded_at)[:10],
+            "z2_ratio": round(z2_ratio, 1),
+            "easy_pct": round(easy_pct, 1),
+        })
+
+    if len(points) < 3:
+        return {
+            "points": points, "assessment": "insufficient_data",
+            "message": "Need more easy run sessions with HR zone data.",
+            "trend": "unknown",
+        }
+
+    mid = len(points) // 2
+    older_avg = sum(p["z2_ratio"] for p in points[mid:]) / len(points[mid:])
+    recent_avg = sum(p["z2_ratio"] for p in points[:mid]) / len(points[:mid])
+    drift_change = recent_avg - older_avg
+
+    if drift_change > 5:
+        trend, message = "improving", "Cardiac drift is decreasing - aerobic efficiency improving."
+    elif drift_change < -5:
+        trend, message = "declining", "Increasing drift - may indicate accumulated fatigue or overheating."
+    else:
+        trend, message = "stable", "Cardiac drift stable - consistent aerobic fitness."
+
+    return {"points": points, "assessment": "ok", "message": message, "trend": trend}
+
+
+def calculate_sleep_insights(rows: list[tuple]) -> dict:
+    """Correlate sleep metrics with next-day HRV.
+
+    rows columns: sleep_secs, sleep_score, hrv
+    """
+    insights = []
+    sleep_secs_list = [(r[0], r[2]) for r in rows if r[0] is not None and r[2] is not None]
+    sleep_score_list = [(r[1], r[2]) for r in rows if r[1] is not None and r[2] is not None]
+
+    # Optimal sleep duration
+    if len(sleep_secs_list) >= 10:
+        buckets: dict[int, list[float]] = {}
+        for secs, hrv in sleep_secs_list:
+            hrs = int(secs / 3600)
+            buckets.setdefault(hrs, []).append(hrv)
+        if buckets:
+            best_hrs = max(buckets, key=lambda h: sum(buckets[h]) / len(buckets[h]))
+            best_avg = sum(buckets[best_hrs]) / len(buckets[best_hrs])
+            insights.append({
+                "type": "optimal_duration", "title": "Optimal Sleep Duration",
+                "finding": f"Your HRV averages {best_avg:.0f} ms after {best_hrs}h of sleep.",
+                "recommendation": f"Aim for {best_hrs}h of sleep for best recovery.",
+            })
+
+    # Sleep score threshold
+    if len(sleep_score_list) >= 10:
+        good = [hrv for score, hrv in sleep_score_list if score >= 75]
+        poor = [hrv for score, hrv in sleep_score_list if score < 60]
+        if good and poor:
+            avg_good = sum(good) / len(good)
+            avg_poor = sum(poor) / len(poor)
+            diff_pct = ((avg_good - avg_poor) / avg_poor * 100) if avg_poor > 0 else 0
+            if abs(diff_pct) > 10:
+                insights.append({
+                    "type": "sleep_score_impact", "title": "Sleep Quality Impact",
+                    "finding": f"HRV is {diff_pct:.0f}% higher after good sleep (score >=75) vs poor sleep (<60).",
+                    "recommendation": "Prioritize sleep quality, not just duration.",
+                })
+
+    if not insights:
+        insights.append({
+            "type": "insufficient", "title": "Keep Logging",
+            "finding": "Not enough sleep data yet for reliable insights.",
+            "recommendation": "Log at least 10 nights of data with HRV for insights.",
+        })
+
+    return {"insights": insights, "data_points": len(rows)}
+
+
+def calculate_taper(
+    race_date_str: str,
+    current_ctl: float,
+    taper_model: str = "exponential",
+) -> dict:
+    """Compute week-by-week volume reduction for race taper."""
+    from datetime import date, datetime
+
+    try:
+        race_date = datetime.strptime(race_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD.", "weeks": [], "race_date": race_date_str}
+
+    today = date.today()
+    days_out = (race_date - today).days
+
+    if days_out <= 0:
+        return {"error": "Race date must be in the future.", "weeks": [], "race_date": race_date_str}
+
+    taper_weeks = min(3, days_out // 7)
+    if taper_weeks < 1:
+        return {
+            "error": f"Only {days_out} days to race - too close for a full taper.",
+            "weeks": [], "race_date": race_date_str,
+        }
+
+    weeks = []
+    for w in range(1, taper_weeks + 1):
+        if taper_model == "linear":
+            reduction_pct = (w / taper_weeks) * 30
+        elif taper_model == "step":
+            reduction_pct = 20 if w < taper_weeks else 30
+        else:  # exponential
+            reduction_pct = (1 - (0.7 ** w)) * 40
+
+        target_volume_pct = round(100 - reduction_pct, 1)
+        days_decay = w * 7
+        proj_ctl = round(
+            current_ctl * ((1 - 1 / 42) ** days_decay * (target_volume_pct / 100 + 0.3)), 1
+        )
+
+        weeks.append({
+            "week": w,
+            "label": f"T-{taper_weeks - w + 1}",
+            "days_to_race": days_out - (w - 1) * 7,
+            "target_volume_pct": target_volume_pct,
+            "reduction_pct": round(reduction_pct, 1),
+            "projected_ctl": proj_ctl,
+        })
+
+    return {
+        "race_date": race_date_str,
+        "days_to_race": days_out,
+        "taper_weeks": taper_weeks,
+        "current_ctl": current_ctl,
+        "model": taper_model,
+        "weeks": weeks,
+    }

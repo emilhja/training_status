@@ -230,6 +230,52 @@ CREATE_SNAPSHOTS_TABLE = """
     )
 """
 
+CREATE_GEAR_TABLE = """
+    CREATE TABLE IF NOT EXISTS gear (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        name             TEXT NOT NULL,
+        gear_type        TEXT NOT NULL DEFAULT 'shoe',
+        brand            TEXT,
+        purchase_date    TEXT,
+        retirement_km    REAL NOT NULL DEFAULT 800,
+        accumulated_km   REAL NOT NULL DEFAULT 0,
+        is_active        INTEGER NOT NULL DEFAULT 1,
+        created_at       TEXT NOT NULL
+    )
+"""
+
+CREATE_HEALTH_EVENTS_TABLE = """
+    CREATE TABLE IF NOT EXISTS health_events (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_date  TEXT NOT NULL,
+        end_date    TEXT,
+        event_type  TEXT NOT NULL,
+        description TEXT NOT NULL,
+        tags        TEXT,
+        created_at  TEXT NOT NULL
+    )
+"""
+
+CREATE_ANNOTATIONS_TABLE = """
+    CREATE TABLE IF NOT EXISTS annotations (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        annotation_date  TEXT NOT NULL,
+        metric           TEXT NOT NULL DEFAULT 'general',
+        content          TEXT NOT NULL,
+        created_at       TEXT NOT NULL
+    )
+"""
+
+CREATE_SHARED_LINKS_TABLE = """
+    CREATE TABLE IF NOT EXISTS shared_links (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        token       TEXT NOT NULL UNIQUE,
+        created_at  TEXT NOT NULL,
+        expires_at  TEXT,
+        is_active   INTEGER NOT NULL DEFAULT 1
+    )
+"""
+
 INSERT_SNAPSHOT = """
     INSERT INTO snapshots (
         recorded_at,

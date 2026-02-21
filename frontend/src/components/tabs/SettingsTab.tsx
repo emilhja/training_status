@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { fetchGoals, createGoal, deleteGoal } from '../../api'
 import type { Goal } from '../../types'
+import ShareButton from '../features/ShareButton'
+import ReportsSection from '../features/ReportsSection'
+import DashboardConfig from '../features/DashboardConfig'
 
 type GoalType = Goal['goal_type']
 
@@ -154,6 +157,21 @@ export default function SettingsTab() {
           })}
         </div>
       )}
+
+      {/* Dashboard Layout */}
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <DashboardConfig />
+      </div>
+
+      {/* Reports */}
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <ReportsSection />
+      </div>
+
+      {/* Share */}
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <ShareButton />
+      </div>
     </div>
   )
 }

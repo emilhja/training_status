@@ -376,3 +376,231 @@ class SuccessResponse(BaseModel):
     """Generic success response."""
 
     success: bool
+
+
+# --- Readiness Score Models ---
+
+
+class ReadinessComponents(BaseModel):
+    tsb: float | None = None
+    hrv_trend: float | None = None
+    sleep: float | None = None
+    fatigue: float | None = None
+    soreness: float | None = None
+
+
+class ReadinessScore(BaseModel):
+    score: int
+    label: str
+    components: ReadinessComponents
+
+
+# --- Workout Suggestion Models ---
+
+
+class WorkoutSuggestion(BaseModel):
+    type: str
+    title: str
+    description: str
+    duration_min: int
+    intensity: str
+    color: str
+
+
+# --- Overload Tracker Models ---
+
+
+class OverloadWeek(BaseModel):
+    label: str
+    current_km: float
+    previous_km: float
+    change_pct: float
+    flagged: bool
+
+
+class OverloadResponse(BaseModel):
+    weeks: list[OverloadWeek]
+    safe: bool
+    recommendation: str
+
+
+# --- Training Zones Models ---
+
+
+class HrZone(BaseModel):
+    zone: str
+    hr_low: int
+    hr_high: int
+
+
+class PaceZone(BaseModel):
+    zone: str
+    pace_low: str
+    pace_high: str
+    speed_low_ms: float
+    speed_high_ms: float
+
+
+class TrainingZonesResponse(BaseModel):
+    hr_zones: list[HrZone]
+    pace_zones: list[PaceZone]
+    data_quality: str
+
+
+# --- HR Drift Models ---
+
+
+class HrDriftPoint(BaseModel):
+    date: str
+    z2_ratio: float
+    easy_pct: float
+
+
+class HrDriftResponse(BaseModel):
+    points: list[HrDriftPoint]
+    assessment: str
+    message: str
+    trend: str
+
+
+# --- Sleep Insights Models ---
+
+
+class SleepInsight(BaseModel):
+    type: str
+    title: str
+    finding: str
+    recommendation: str
+
+
+class SleepInsightsResponse(BaseModel):
+    insights: list[SleepInsight]
+    data_points: int
+
+
+# --- Taper Models ---
+
+
+class TaperWeek(BaseModel):
+    week: int
+    label: str
+    days_to_race: int
+    target_volume_pct: float
+    reduction_pct: float
+    projected_ctl: float
+
+
+class TaperResponse(BaseModel):
+    race_date: str
+    days_to_race: int | None = None
+    taper_weeks: int | None = None
+    current_ctl: float | None = None
+    model: str | None = None
+    weeks: list[TaperWeek]
+    error: str | None = None
+
+
+# --- Gear Models ---
+
+
+class Gear(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    gear_type: str
+    brand: str | None = None
+    purchase_date: str | None = None
+    retirement_km: float
+    accumulated_km: float
+    is_active: bool
+    created_at: str
+
+
+class GearCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    gear_type: str = Field("shoe", pattern=r"^(shoe|apparel|accessory)$")
+    brand: str | None = None
+    purchase_date: str | None = None
+    retirement_km: float = Field(800.0, gt=0)
+
+
+class GearUpdate(BaseModel):
+    name: str | None = None
+    brand: str | None = None
+    retirement_km: float | None = None
+    accumulated_km: float | None = None
+
+
+class GearList(BaseModel):
+    items: list[Gear]
+
+
+# --- Health Event Models ---
+
+
+class HealthEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    event_date: str
+    end_date: str | None = None
+    event_type: str
+    description: str
+    tags: str | None = None
+    created_at: str
+
+
+class HealthEventCreate(BaseModel):
+    event_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str | None = None
+    event_type: str = Field(..., pattern=r"^(illness|injury|rest_period)$")
+    description: str = Field(..., min_length=1, max_length=500)
+    tags: str | None = None
+
+
+class HealthEventUpdate(BaseModel):
+    end_date: str | None = None
+    description: str | None = None
+    tags: str | None = None
+
+
+class HealthEventList(BaseModel):
+    items: list[HealthEvent]
+
+
+# --- Annotation Models ---
+
+
+class Annotation(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    annotation_date: str
+    metric: str
+    content: str
+    created_at: str
+
+
+class AnnotationCreate(BaseModel):
+    annotation_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    metric: str = Field("general", pattern=r"^(ctl|hrv|tsb|general)$")
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+class AnnotationList(BaseModel):
+    items: list[Annotation]
+
+
+# --- Shared Link Models ---
+
+
+class SharedLink(BaseModel):
+    token: str
+    created_at: str
+    expires_at: str | None = None
+    is_active: bool
+
+
+class SharedLinkCreate(BaseModel):
+    expires_days: int | None = Field(None, ge=1, le=365)

@@ -17,34 +17,57 @@ from .config import get_settings
 from .database import SNAPSHOT_COLUMNS, get_db
 from .models import (
     AdherenceReport,
+    AnnotationCreate,
+    AnnotationList,
     ConsistencyScore,
     CorrelationsResponse,
     DetrainingResponse,
     FetchResponse,
+    GearCreate,
+    GearList,
+    GearUpdate,
     GoalCreate,
     GoalList,
+    HealthEventCreate,
+    HealthEventList,
+    HealthEventUpdate,
+    HrDriftResponse,
     InjuryRisk,
     NoteCreate,
     NoteList,
+    OverloadResponse,
     PersonalRecordsResponse,
     ProjectionsResponse,
     RacePredictorResponse,
+    ReadinessScore,
     Recommendation,
+    SharedLinkCreate,
+    SleepInsightsResponse,
     Snapshot,
     SnapshotList,
     StravaStatus,
     SuccessResponse,
+    TaperResponse,
+    TrainingZonesResponse,
     WeeklySummary,
+    WorkoutSuggestion,
 )
 from .services.analytics import (
     calculate_consistency_score,
     calculate_detraining,
     calculate_goal_adherence,
+    calculate_hr_drift,
     calculate_injury_risk,
+    calculate_overload,
     calculate_projections,
     calculate_race_predictions,
+    calculate_readiness_score,
+    calculate_sleep_insights,
+    calculate_taper,
+    calculate_training_zones,
     calculate_weekly_summary,
     get_recommendation,
+    suggest_workout,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +86,18 @@ def _run_scheduled_fetch() -> None:
         logger.info("Scheduled fetch completed successfully")
     except Exception as e:
         logger.error("Scheduled fetch failed: %s", e)
+
+
+def _run_weekly_report() -> None:
+    """Generate the weekly PDF report (called by the background scheduler)."""
+    from .services.reports import generate_weekly_pdf
+
+    try:
+        settings = get_settings()
+        path = generate_weekly_pdf(get_db(), settings.reports_dir)
+        logger.info("Weekly PDF generated: %s", path)
+    except Exception as e:
+        logger.error("Weekly PDF generation failed: %s", e)
 
 
 @asynccontextmanager
@@ -88,6 +123,20 @@ async def lifespan(app: FastAPI) -> Any:  # type: ignore[type-arg]
                 id="daily_fetch",
                 replace_existing=True,
             )
+            # Weekly report job
+            if settings.report_schedule:
+                rpt_fields = settings.report_schedule.split()
+                if len(rpt_fields) == 5:
+                    r_min, r_hr, r_day, r_mon, r_dow = rpt_fields
+                    scheduler.add_job(
+                        _run_weekly_report,
+                        "cron",
+                        minute=r_min, hour=r_hr, day=r_day,
+                        month=r_mon, day_of_week=r_dow,
+                        id="weekly_report",
+                        replace_existing=True,
+                    )
+
             scheduler.start()
             logger.info("Scheduler started — fetch cron: %s", settings.fetch_schedule)
         else:
@@ -110,7 +159,7 @@ settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type"],
 )
 
@@ -606,6 +655,292 @@ def export_csv() -> StreamingResponse:
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=training_data.csv"},
     )
+
+
+# --- NEW ANALYTICS ENDPOINTS ---
+
+
+@app.get("/api/analytics/readiness", response_model=ReadinessScore)
+def get_readiness() -> dict[str, Any]:
+    """Composite training readiness score 0-100."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["tsb", "hrv", "sleep_score", "fatigue", "soreness"], limit=8
+    )
+    if not rows:
+        return {"score": 50, "label": "Unknown", "components": {}}
+
+    tsb, hrv_latest, sleep_score, fatigue, soreness = rows[0]
+    hrv_trend_pct: float | None = None
+    hrv_values = [r[1] for r in rows if r[1] is not None]
+    if len(hrv_values) >= 3:
+        baseline = sum(hrv_values[1:]) / len(hrv_values[1:])
+        if baseline > 0:
+            hrv_trend_pct = ((hrv_values[0] - baseline) / baseline) * 100
+
+    return calculate_readiness_score(tsb, hrv_trend_pct, sleep_score, fatigue, soreness)
+
+
+@app.get("/api/analytics/workout-suggestion", response_model=WorkoutSuggestion)
+def get_workout_suggestion() -> dict[str, Any]:
+    """Rule-based workout suggestion for today."""
+    from datetime import datetime as dt
+
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["tsb", "sleep_score", "rest_days", "week_0_km", "week_1_km"], limit=1
+    )
+    tsb = sleep_score = rest_days = week_change_pct = None
+    if rows:
+        tsb, sleep_score, rest_days, w0, w1 = rows[0]
+        if w0 is not None and w1 is not None and w1 > 0:
+            week_change_pct = ((w0 - w1) / w1) * 100
+    return suggest_workout(tsb, sleep_score, rest_days, dt.now().weekday(), week_change_pct)
+
+
+@app.get("/api/analytics/overload", response_model=OverloadResponse)
+def get_overload() -> dict[str, Any]:
+    """Progressive overload tracking - week-over-week volume changes."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["week_0_km", "week_1_km", "week_2_km", "week_3_km", "week_4_km"], limit=1
+    )
+    return calculate_overload(rows)
+
+
+@app.get("/api/analytics/zones", response_model=TrainingZonesResponse)
+def get_training_zones() -> dict[str, Any]:
+    """Compute HR and pace training zones."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["resting_hr", "max_hr", "critical_speed"], limit=1
+    )
+    if not rows:
+        return {"hr_zones": [], "pace_zones": [], "data_quality": "none"}
+    resting_hr, max_hr, critical_speed = rows[0]
+    return calculate_training_zones(resting_hr, max_hr, critical_speed)
+
+
+@app.get("/api/analytics/hr-drift", response_model=HrDriftResponse)
+def get_hr_drift() -> dict[str, Any]:
+    """HR zone drift analysis for easy sessions."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=[
+            "hr_zone_z1_secs", "hr_zone_z2_secs", "hr_zone_z3_secs",
+            "hr_zone_z4_secs", "hr_zone_z5_secs", "recorded_at",
+        ],
+        limit=60,
+    )
+    return calculate_hr_drift(rows)
+
+
+@app.get("/api/analytics/sleep-insights", response_model=SleepInsightsResponse)
+def get_sleep_insights() -> dict[str, Any]:
+    """Sleep optimization insights."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=["sleep_secs", "sleep_score", "hrv"], limit=60
+    )
+    return calculate_sleep_insights(rows)
+
+
+@app.get("/api/analytics/taper", response_model=TaperResponse)
+def get_taper(
+    race_date: str = Query(..., description="Race date YYYY-MM-DD"),
+    model: str = Query("exponential", pattern=r"^(exponential|linear|step)$"),
+) -> dict[str, Any]:
+    """Calculate taper schedule toward a race date."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(columns=["ctl"], limit=1)
+    current_ctl = rows[0][0] if rows and rows[0][0] is not None else 30.0
+    return calculate_taper(race_date, current_ctl, model)
+
+
+# --- GEAR ENDPOINTS ---
+
+
+@app.get("/api/gear", response_model=GearList)
+def get_gear() -> dict[str, Any]:
+    """Get all active gear."""
+    db = get_db()
+    return {"items": [dict(r) for r in db.get_gear()]}
+
+
+@app.post("/api/gear", response_model=SuccessResponse)
+def create_gear(gear: GearCreate) -> dict[str, Any]:
+    """Add new gear."""
+    db = get_db()
+    db.create_gear(gear.name, gear.gear_type, gear.brand, gear.purchase_date, gear.retirement_km)
+    return {"success": True}
+
+
+@app.put("/api/gear/{gear_id}", response_model=SuccessResponse)
+def update_gear(gear_id: int, update: GearUpdate) -> dict[str, Any]:
+    """Update gear details."""
+    db = get_db()
+    db.update_gear(gear_id, **update.model_dump(exclude_none=True))
+    return {"success": True}
+
+
+@app.delete("/api/gear/{gear_id}", response_model=SuccessResponse)
+def retire_gear(gear_id: int) -> dict[str, Any]:
+    """Retire a gear item."""
+    db = get_db()
+    db.delete_gear(gear_id)
+    return {"success": True}
+
+
+# --- HEALTH EVENTS ENDPOINTS ---
+
+
+@app.get("/api/health-events", response_model=HealthEventList)
+def get_health_events() -> dict[str, Any]:
+    """Get health event log."""
+    db = get_db()
+    return {"items": [dict(r) for r in db.get_health_events()]}
+
+
+@app.post("/api/health-events", response_model=SuccessResponse)
+def create_health_event(event: HealthEventCreate) -> dict[str, Any]:
+    """Log an illness, injury, or rest period."""
+    db = get_db()
+    db.create_health_event(event.event_date, event.end_date, event.event_type,
+                           event.description, event.tags)
+    return {"success": True}
+
+
+@app.put("/api/health-events/{event_id}", response_model=SuccessResponse)
+def update_health_event(event_id: int, update: HealthEventUpdate) -> dict[str, Any]:
+    """Update a health event."""
+    db = get_db()
+    db.update_health_event(event_id, **update.model_dump(exclude_none=True))
+    return {"success": True}
+
+
+@app.delete("/api/health-events/{event_id}", response_model=SuccessResponse)
+def delete_health_event(event_id: int) -> dict[str, Any]:
+    """Delete a health event."""
+    db = get_db()
+    db.delete_health_event(event_id)
+    return {"success": True}
+
+
+# --- ANNOTATION ENDPOINTS ---
+
+
+@app.get("/api/annotations", response_model=AnnotationList)
+def get_annotations(metric: str | None = Query(None)) -> dict[str, Any]:
+    """Get chart annotations."""
+    db = get_db()
+    return {"items": [dict(r) for r in db.get_annotations(metric=metric)]}
+
+
+@app.post("/api/annotations", response_model=SuccessResponse)
+def create_annotation(ann: AnnotationCreate) -> dict[str, Any]:
+    """Add a chart annotation."""
+    db = get_db()
+    db.create_annotation(ann.annotation_date, ann.metric, ann.content)
+    return {"success": True}
+
+
+@app.delete("/api/annotations/{ann_id}", response_model=SuccessResponse)
+def delete_annotation(ann_id: int) -> dict[str, Any]:
+    """Delete an annotation."""
+    db = get_db()
+    db.delete_annotation(ann_id)
+    return {"success": True}
+
+
+# --- SHARED LINK ENDPOINTS ---
+
+
+@app.post("/api/share")
+def create_share_link(body: SharedLinkCreate) -> dict[str, Any]:
+    """Create a read-only shared link."""
+    import uuid
+    from datetime import datetime, timedelta
+
+    db = get_db()
+    token = str(uuid.uuid4())
+    expires_at = None
+    if body.expires_days:
+        expires_at = (datetime.now() + timedelta(days=body.expires_days)).isoformat()
+    db.create_shared_link(token, expires_at)
+    return {"token": token, "url": f"/shared/{token}", "expires_at": expires_at}
+
+
+@app.get("/api/shared/{token}")
+def get_shared_view(token: str) -> dict[str, Any]:
+    """Public read-only snapshot for shared links."""
+    from datetime import datetime
+
+    db = get_db()
+    link = db.get_shared_link(token)
+    if not link or not link["is_active"]:
+        raise HTTPException(status_code=404, detail="Share link not found or expired")
+    if link["expires_at"]:
+        if datetime.fromisoformat(link["expires_at"]) < datetime.now():
+            raise HTTPException(status_code=410, detail="Share link has expired")
+    row = db.get_latest_snapshot()
+    if not row:
+        raise HTTPException(status_code=404, detail="No data available")
+    d = row_to_dict(row)
+    return {
+        "recorded_at": d.get("recorded_at"),
+        "ctl": d.get("ctl"), "tsb": d.get("tsb"), "hrv": d.get("hrv"),
+        "week_0_km": d.get("week_0_km"), "rest_days": d.get("rest_days"),
+        "vo2max": d.get("vo2max"),
+    }
+
+
+# --- REPORT ENDPOINTS ---
+
+
+@app.get("/api/reports")
+def list_reports() -> dict[str, Any]:
+    """List available weekly PDF reports."""
+    settings = get_settings()
+    if not settings.reports_dir.exists():
+        return {"reports": []}
+    pdfs = sorted(settings.reports_dir.glob("weekly_report_*.pdf"), reverse=True)
+    return {"reports": [p.name for p in pdfs]}
+
+
+@app.get("/api/reports/latest")
+def get_latest_report() -> FileResponse:
+    """Download the most recent weekly PDF report."""
+    settings = get_settings()
+    if not settings.reports_dir.exists():
+        raise HTTPException(status_code=404, detail="No reports generated yet")
+    pdfs = sorted(settings.reports_dir.glob("weekly_report_*.pdf"), reverse=True)
+    if not pdfs:
+        raise HTTPException(status_code=404, detail="No reports found")
+    return FileResponse(str(pdfs[0]), media_type="application/pdf", filename=pdfs[0].name)
+
+
+@app.get("/api/reports/{filename}")
+def get_report(filename: str) -> FileResponse:
+    """Download a specific report."""
+    import re
+
+    if not re.match(r"^weekly_report_\d{4}-\d{2}-\d{2}\.pdf$", filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    settings = get_settings()
+    path = settings.reports_dir / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+    return FileResponse(str(path), media_type="application/pdf", filename=filename)
+
+
+@app.post("/api/reports/generate", response_model=SuccessResponse)
+def generate_report_now() -> dict[str, Any]:
+    """Generate a PDF report on demand."""
+    from .services.reports import generate_weekly_pdf
+
+    settings = get_settings()
+    generate_weekly_pdf(get_db(), settings.reports_dir)
+    return {"success": True}
 
 
 # Serve built frontend with SPA support

@@ -24,6 +24,9 @@ ENV/
 data/*.db
 *.db
 
+# Reports
+data/reports/
+
 # Logs
 *.log
 

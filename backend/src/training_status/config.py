@@ -23,10 +23,15 @@ class Settings(BaseSettings):
     base_dir: Path = Path(__file__).parent.parent.parent.parent
     db_path: Path = base_dir / "data" / "training_status.db"
 
+    # Reports
+    reports_dir: Path = base_dir / "data" / "reports"
+
     # Scheduler
     # Cron expression for automated daily fetch. Default: 6:00 AM every day.
     # Set to empty string "" to disable the scheduler.
     fetch_schedule: str = "0 6 * * *"
+    # Cron expression for weekly PDF report. Default: Monday 7:00 AM.
+    report_schedule: str = "0 7 * * 1"
 
     # API Settings
     # cors_origins is only relevant in dev mode (Vite on :5173 → uvicorn on :8000).

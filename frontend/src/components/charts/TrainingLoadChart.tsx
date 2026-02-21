@@ -1,15 +1,25 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import type { Snapshot } from '../../types'
+import { useEffect, useState } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import type { Snapshot, AnnotationItem } from '../../types'
+import { fetchAnnotations } from '../../api'
 
 interface Props { snapshots: Snapshot[] }
 
 export default function TrainingLoadChart({ snapshots }: Props) {
+  const [annotations, setAnnotations] = useState<AnnotationItem[]>([])
+
+  useEffect(() => {
+    fetchAnnotations('training_load').then(d => setAnnotations(d.items)).catch(() => {})
+  }, [])
+
   const data = snapshots.map(s => ({
     date: s.recorded_at.slice(0, 10),
     CTL:  s.ctl,
     ATL:  s.atl,
     TSB:  s.tsb,
   }))
+
+  const dates = new Set(data.map(d => d.date))
 
   return (
     <div>
@@ -21,6 +31,9 @@ export default function TrainingLoadChart({ snapshots }: Props) {
           <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
           <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#f3f4f6' }} />
           <Legend wrapperStyle={{ color: '#9ca3af', fontSize: 12 }} />
+          {annotations.filter(a => dates.has(a.annotation_date)).map(a => (
+            <ReferenceLine key={a.id} x={a.annotation_date} stroke="#fbbf24" strokeDasharray="4 2" label={{ value: a.content, position: 'top', fill: '#fbbf24', fontSize: 10 }} />
+          ))}
           <Line type="monotone" dataKey="CTL" stroke="#3b82f6" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="ATL" stroke="#f97316" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="TSB" stroke="#a855f7" strokeWidth={2} dot={false} />

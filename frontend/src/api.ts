@@ -6,30 +6,47 @@ import type {
   OverloadResponse, TrainingZonesData, HrDriftData, SleepInsightsData, TaperData,
   GearItem, HealthEvent, AnnotationItem
 } from './types'
+import { getCached, setCached, deleteCached, clearCache } from './idb'
+
+/**
+ * Network-first GET with IndexedDB fallback.
+ * On success: caches response in IDB and returns it.
+ * On failure: returns cached version from IDB (offline mode).
+ * If no cache exists either, throws.
+ */
+async function cachedGet<T>(url: string): Promise<T> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data: T = await res.json()
+    setCached(url, data) // fire-and-forget
+    return data
+  } catch (err) {
+    const cached = await getCached<T>(url)
+    if (cached !== null) return cached
+    throw err
+  }
+}
 
 export async function fetchLatest(): Promise<Snapshot> {
-  const res = await fetch('/api/snapshots/latest')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/snapshots/latest')
 }
 
 export async function fetchSnapshots(limit = 90): Promise<SnapshotsResponse> {
-  const res = await fetch(`/api/snapshots?limit=${limit}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet(`/api/snapshots?limit=${limit}`)
 }
 
 export async function triggerFetch(): Promise<FetchResult> {
   const res = await fetch('/api/fetch', { method: 'POST' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  const data: FetchResult = await res.json()
+  await clearCache() // new data arrived — invalidate all cached responses
+  return data
 }
 
 // Goals API
 export async function fetchGoals(): Promise<{ items: Goal[] }> {
-  const res = await fetch('/api/goals')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/goals')
 }
 
 export async function createGoal(goal_type: string, target_value: number, period_start?: string): Promise<{ success: boolean }> {
@@ -39,32 +56,28 @@ export async function createGoal(goal_type: string, target_value: number, period
     body: JSON.stringify({ goal_type, target_value, period_start: period_start ?? null }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/goals')
   return res.json()
 }
 
 export async function deleteGoal(goalId: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/goals')
   return res.json()
 }
 
 // Analytics API
 export async function fetchConsistencyScore(): Promise<ConsistencyScore> {
-  const res = await fetch('/api/analytics/consistency')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/consistency')
 }
 
 export async function fetchRecommendation(): Promise<Recommendation> {
-  const res = await fetch('/api/analytics/recommendation')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/recommendation')
 }
 
 export async function fetchProjections(): Promise<ProjectionsResponse> {
-  const res = await fetch('/api/analytics/projections')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/projections')
 }
 
 // Export API
@@ -78,51 +91,35 @@ export function getExportCsvUrl(): string {
 
 // New Analytics APIs
 export async function fetchInjuryRisk(): Promise<InjuryRisk> {
-  const res = await fetch('/api/analytics/injury-risk')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/injury-risk')
 }
 
 export async function fetchCorrelations(): Promise<CorrelationsResponse> {
-  const res = await fetch('/api/analytics/correlations')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/correlations')
 }
 
 export async function fetchRacePredictions(): Promise<RacePredictorResponse> {
-  const res = await fetch('/api/analytics/race-predictor')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/race-predictor')
 }
 
 export async function fetchDetraining(): Promise<DetrainingResponse> {
-  const res = await fetch('/api/analytics/detraining')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/detraining')
 }
 
 export async function fetchWeeklySummary(): Promise<WeeklySummary> {
-  const res = await fetch('/api/analytics/summary')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/summary')
 }
 
 export async function fetchAdherence(): Promise<AdherenceReport[]> {
-  const res = await fetch('/api/analytics/adherence')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/adherence')
 }
 
 export async function fetchPersonalRecords(): Promise<{ records: PersonalRecord[] }> {
-  const res = await fetch('/api/personal-records')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/personal-records')
 }
 
 export async function fetchNotes(limit = 50): Promise<{ items: Note[] }> {
-  const res = await fetch(`/api/notes?limit=${limit}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet(`/api/notes?limit=${limit}`)
 }
 
 export async function createNote(note_date: string, content: string): Promise<{ success: boolean }> {
@@ -132,71 +129,55 @@ export async function createNote(note_date: string, content: string): Promise<{ 
     body: JSON.stringify({ note_date, content }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/notes?limit=50')
   return res.json()
 }
 
 export async function deleteNote(noteId: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/notes?limit=50')
   return res.json()
 }
 
 export async function fetchStravaStatus(): Promise<StravaStatus> {
-  const res = await fetch('/api/strava/status')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/strava/status')
 }
 
 // --- New Analytics APIs ---
 
 export async function fetchReadiness(): Promise<ReadinessScoreData> {
-  const res = await fetch('/api/analytics/readiness')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/readiness')
 }
 
 export async function fetchWorkoutSuggestion(): Promise<WorkoutSuggestionData> {
-  const res = await fetch('/api/analytics/workout-suggestion')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/workout-suggestion')
 }
 
 export async function fetchOverload(): Promise<OverloadResponse> {
-  const res = await fetch('/api/analytics/overload')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/overload')
 }
 
 export async function fetchTrainingZones(): Promise<TrainingZonesData> {
-  const res = await fetch('/api/analytics/zones')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/zones')
 }
 
 export async function fetchHrDrift(): Promise<HrDriftData> {
-  const res = await fetch('/api/analytics/hr-drift')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/hr-drift')
 }
 
 export async function fetchSleepInsights(): Promise<SleepInsightsData> {
-  const res = await fetch('/api/analytics/sleep-insights')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/analytics/sleep-insights')
 }
 
 export async function fetchTaper(raceDate: string, model = 'exponential'): Promise<TaperData> {
-  const res = await fetch(`/api/analytics/taper?race_date=${raceDate}&model=${model}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet(`/api/analytics/taper?race_date=${raceDate}&model=${model}`)
 }
 
 // --- Gear APIs ---
 
 export async function fetchGear(): Promise<{ items: GearItem[] }> {
-  const res = await fetch('/api/gear')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/gear')
 }
 
 export async function createGear(data: { name: string; gear_type: string; brand?: string; purchase_date?: string; retirement_km: number }): Promise<{ success: boolean }> {
@@ -205,6 +186,7 @@ export async function createGear(data: { name: string; gear_type: string; brand?
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/gear')
   return res.json()
 }
 
@@ -214,21 +196,21 @@ export async function updateGear(id: number, data: Record<string, unknown>): Pro
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/gear')
   return res.json()
 }
 
 export async function deleteGear(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/gear/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/gear')
   return res.json()
 }
 
 // --- Health Events APIs ---
 
 export async function fetchHealthEvents(): Promise<{ items: HealthEvent[] }> {
-  const res = await fetch('/api/health-events')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/health-events')
 }
 
 export async function createHealthEvent(data: { event_date: string; end_date?: string; event_type: string; description: string; tags?: string }): Promise<{ success: boolean }> {
@@ -237,12 +219,14 @@ export async function createHealthEvent(data: { event_date: string; end_date?: s
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/health-events')
   return res.json()
 }
 
 export async function deleteHealthEvent(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/health-events/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/health-events')
   return res.json()
 }
 
@@ -250,9 +234,7 @@ export async function deleteHealthEvent(id: number): Promise<{ success: boolean 
 
 export async function fetchAnnotations(metric?: string): Promise<{ items: AnnotationItem[] }> {
   const url = metric ? `/api/annotations?metric=${metric}` : '/api/annotations'
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet(url)
 }
 
 export async function createAnnotation(data: { annotation_date: string; metric: string; content: string }): Promise<{ success: boolean }> {
@@ -261,12 +243,14 @@ export async function createAnnotation(data: { annotation_date: string; metric: 
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/annotations')
   return res.json()
 }
 
 export async function deleteAnnotation(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/annotations/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/annotations')
   return res.json()
 }
 
@@ -282,21 +266,18 @@ export async function createShareLink(expiresDays?: number): Promise<{ token: st
 }
 
 export async function fetchSharedView(token: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`/api/shared/${token}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet(`/api/shared/${token}`)
 }
 
 // --- Reports APIs ---
 
 export async function fetchReports(): Promise<{ reports: string[] }> {
-  const res = await fetch('/api/reports')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return cachedGet('/api/reports')
 }
 
 export async function generateReport(): Promise<{ success: boolean }> {
   const res = await fetch('/api/reports/generate', { method: 'POST' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/reports')
   return res.json()
 }

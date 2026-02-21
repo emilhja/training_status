@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { fetchLatest } from '../api'
 import type { Snapshot } from '../types'
 
@@ -7,12 +7,16 @@ export function useLatestSnapshot() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  useEffect(() => {
+  const refetch = useCallback(() => {
+    setLoading(true)
+    setError(null)
     fetchLatest()
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  return { data, loading, error }
+  useEffect(() => { refetch() }, [refetch])
+
+  return { data, loading, error, refetch }
 }

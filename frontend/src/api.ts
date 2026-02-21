@@ -31,9 +31,11 @@ export async function fetchGoals(): Promise<{ items: Goal[] }> {
 }
 
 export async function createGoal(goal_type: string, target_value: number, period_start?: string): Promise<{ success: boolean }> {
-  const params = new URLSearchParams({ goal_type, target_value: target_value.toString() })
-  if (period_start) params.append('period_start', period_start)
-  const res = await fetch(`/api/goals?${params}`, { method: 'POST' })
+  const res = await fetch('/api/goals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal_type, target_value, period_start: period_start ?? null }),
+  })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }

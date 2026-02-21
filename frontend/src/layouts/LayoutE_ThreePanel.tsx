@@ -3,6 +3,7 @@
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect } from 'react'
+import { triggerFetch } from '../api'
 import { useLatestSnapshot } from '../hooks/useLatestSnapshot'
 import { useSnapshots } from '../hooks/useSnapshots'
 import MetricCard from '../components/current/MetricCard'
@@ -36,15 +37,16 @@ import TrainingLog from '../components/features/TrainingLog'
 import GoalAdherence from '../components/features/GoalAdherence'
 import TsbZonesChart from '../components/charts/TsbZonesChart'
 import DetrainingChart from '../components/charts/DetrainingChart'
+import SettingsTab from '../components/tabs/SettingsTab'
 import { useState } from 'react'
 import {
   ctlStatus, atlStatus, tsbStatus, tsbZone, acStatus, sleepStatus, subjectiveStatus,
   fmtSleep, fmt, fmtCadence,
 } from '../utils/metrics'
 
-type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'compact' | 'accordion'
+type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'compact' | 'accordion' | 'settings'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'compact', 'accordion']
+const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'compact', 'accordion', 'settings']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⊞' },
   { id: 'training', label: 'Training', icon: '▲' },
@@ -54,13 +56,25 @@ const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'log', label: 'Log', icon: '📝' },
   { id: 'compact', label: 'Compact View', icon: '⬚' },
   { id: 'accordion', label: 'Accordion View', icon: '☰' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
 ]
 
 export default function LayoutE_ThreePanel() {
   const { view } = useParams<{ view: string }>()
   const navigate = useNavigate()
   const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const { data: s, loading, error } = useLatestSnapshot()
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await triggerFetch()
+    } finally {
+      refetch()
+      setRefreshing(false)
+    }
+  }
+  const { data: s, loading, error, refetch } = useLatestSnapshot()
   const { data: historyData } = useSnapshots(90)
   const snapshots = historyData ? [...historyData.items].reverse() : []
 
@@ -326,9 +340,12 @@ export default function LayoutE_ThreePanel() {
 
       case 'compact':
         return <LayoutB_CompactDashboard />
-      
+
       case 'accordion':
         return <LayoutC_Accordion />
+
+      case 'settings':
+        return <SettingsTab />
     }
   }
 
@@ -361,8 +378,12 @@ export default function LayoutE_ThreePanel() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-sm font-medium transition-colors">
-            Refresh
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors"
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </header>

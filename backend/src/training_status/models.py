@@ -133,7 +133,7 @@ class Goal(BaseModel):
 class GoalCreate(BaseModel):
     """Create a new goal."""
 
-    goal_type: str = Field(..., pattern=r"^(weekly_km|monthly_km|yearly_km)$")
+    goal_type: str = Field(..., pattern=r"^(weekly_km|monthly_km|yearly_km|weekly_weightlifting_sessions)$")
     target_value: float = Field(..., gt=0)
     period_start: str | None = None
 
@@ -405,6 +405,7 @@ class WorkoutSuggestion(BaseModel):
     duration_min: int
     intensity: str
     color: str
+    data_age_hours: int | None = None
 
 
 # --- Overload Tracker Models ---

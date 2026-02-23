@@ -625,7 +625,7 @@ def suggest_workout(
     """Rule-based workout suggestion for today."""
     if rest_days is not None and rest_days == 0:
         return {
-            "type": "done", "title": "You Already Ran Today",
+            "type": "done", "title": "You Already Trained Today",
             "description": "Nice work! Consider resting or doing light mobility/stretching.",
             "duration_min": 0, "intensity": "none", "color": "green",
         }

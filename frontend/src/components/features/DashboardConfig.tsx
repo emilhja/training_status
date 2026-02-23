@@ -4,6 +4,7 @@ import type { DashboardWidget } from '../../types'
 const STORAGE_KEY = 'training_status_dashboard_config'
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
+  { id: 'weekly_activities', visible: true },
   { id: 'readiness', visible: true },
   { id: 'workout_suggestion', visible: true },
   { id: 'weekly_summary', visible: true },
@@ -33,6 +34,7 @@ const WIDGET_LABELS: Record<string, string> = {
   correlation_insights: 'Correlation Insights',
   training_load_chart: 'Training Load Chart',
   calendar_heatmap: 'Calendar Heatmap',
+  weekly_activities: 'This Week (Run & Lift)',
 }
 
 export function loadDashboardConfig(): DashboardWidget[] {

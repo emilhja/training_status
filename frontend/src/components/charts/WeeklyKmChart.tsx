@@ -17,8 +17,8 @@ export default function WeeklyKmChart({ snapshot: s }: Props) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">Weekly Running (km)</h3>
-      <div className="h-[200px] sm:h-[280px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[200px] sm:h-[280px] min-w-0">
+      <ResponsiveContainer width="100%" height="100%" debounce={50}>
         <BarChart data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis dataKey="week" tick={{ fill: '#9ca3af', fontSize: 11 }} />

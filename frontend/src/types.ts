@@ -101,7 +101,7 @@ export type Status = 'good' | 'ok' | 'bad' | 'neutral'
 export interface Goal {
   id: number
   created_at: string
-  goal_type: 'weekly_km' | 'monthly_km' | 'yearly_km'
+  goal_type: 'weekly_km' | 'monthly_km' | 'yearly_km' | 'weekly_weightlifting_sessions'
   target_value: number
   period_start: string | null
   is_active: number
@@ -268,6 +268,29 @@ export interface WorkoutSuggestionData {
   duration_min: number
   intensity: string
   color: string
+  data_age_hours?: number
+}
+
+export interface ActivitySummaryItem {
+  type: string
+  count: number
+  total_minutes: number
+  total_km: number
+}
+
+export interface ActivityItem {
+  id: string | number
+  date: string
+  type: string
+  name: string
+  distance_km: number
+  duration_min: number
+  load: number | null
+}
+
+export interface WeeklyActivitiesData {
+  summary: ActivitySummaryItem[]
+  activities: ActivityItem[]
 }
 
 export interface OverloadWeek {

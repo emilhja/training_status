@@ -252,6 +252,56 @@ export default function SettingsTab() {
         </div>
       )}
 
+      {/* Strength Training Target */}
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Strength Training</h2>
+        {(() => {
+          const type: GoalType = 'weekly_weightlifting_sessions'
+          const goal = activeGoal(type)
+          const isEditing = edit?.type === type
+          return (
+            <div className="bg-gray-900 rounded-xl p-4">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <p className="text-sm font-medium text-gray-200">Weekly sessions</p>
+                  <p className="text-xs text-gray-500">Weight lifting sessions to target per week</p>
+                </div>
+                {goal && !isEditing && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold text-gray-100">{goal.target_value} <span className="text-sm text-gray-500">sessions</span></span>
+                    <button onClick={() => setEdit({ type, value: String(goal.target_value) })} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Edit</button>
+                    <button onClick={() => handleDelete(goal)} disabled={deleting === goal.id} className="text-xs text-red-500 hover:text-red-400 disabled:opacity-50 transition-colors">
+                      {deleting === goal.id ? '…' : 'Remove'}
+                    </button>
+                  </div>
+                )}
+                {!goal && !isEditing && (
+                  <button onClick={() => setEdit({ type, value: '' })} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">+ Set target</button>
+                )}
+              </div>
+              {isEditing && (
+                <div className="flex items-center gap-2 mt-3">
+                  <input
+                    type="number" min="1" max="14" step="1"
+                    value={edit.value}
+                    onChange={e => setEdit({ type, value: e.target.value })}
+                    onKeyDown={e => e.key === 'Enter' && handleSave(type, edit.value)}
+                    placeholder="e.g. 3"
+                    className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                    autoFocus
+                  />
+                  <span className="text-sm text-gray-500">sessions / week</span>
+                  <button onClick={() => handleSave(type, edit.value)} disabled={saving === type || !edit.value} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors">
+                    {saving === type ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={() => setEdit(null)} className="px-3 py-2 text-gray-500 hover:text-gray-300 text-sm transition-colors">Cancel</button>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </div>
+
       {/* Daily Reminder */}
       <div className="mt-10 border-t border-gray-800 pt-6">
         <ReminderSettings />

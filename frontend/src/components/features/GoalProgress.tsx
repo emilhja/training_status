@@ -66,11 +66,12 @@ function getYearlyProgress(snapshot: Snapshot, goal: Goal): Progress {
   return { current, target, pct, remaining, timeLabel: `${daysLeft}d left in year`, paceNeeded, daysLeft }
 }
 
-function getGoalProgress(snapshot: Snapshot, goal: Goal): Progress {
+function getGoalProgress(snapshot: Snapshot, goal: Goal): Progress | null {
   switch (goal.goal_type) {
     case 'weekly_km':  return getWeeklyProgress(snapshot, goal)
     case 'monthly_km': return getMonthlyProgress(snapshot, goal)
     case 'yearly_km':  return getYearlyProgress(snapshot, goal)
+    default: return null
   }
 }
 
@@ -78,6 +79,7 @@ const GOAL_LABELS: Record<Goal['goal_type'], string> = {
   weekly_km:  'Weekly Goal',
   monthly_km: 'Monthly Goal (last 30d)',
   yearly_km:  'Yearly Goal (estimated)',
+  weekly_weightlifting_sessions: 'Weekly Lift Sessions',
 }
 
 function getColor(pct: number) {
@@ -112,7 +114,9 @@ export default function GoalProgress({ snapshot }: Props) {
   return (
     <div className="space-y-4">
       {goals.map(goal => {
-        const { current, target, pct, remaining, timeLabel, paceNeeded, daysLeft } = getGoalProgress(snapshot, goal)
+        const progress = getGoalProgress(snapshot, goal)
+        if (!progress) return null
+        const { current, target, pct, remaining, timeLabel, paceNeeded, daysLeft } = progress
         const status = getStatus(pct, daysLeft)
 
         return (

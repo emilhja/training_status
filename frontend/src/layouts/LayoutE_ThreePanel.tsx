@@ -38,6 +38,8 @@ import GoalAdherence from '../components/features/GoalAdherence'
 import TsbZonesChart from '../components/charts/TsbZonesChart'
 import DetrainingChart from '../components/charts/DetrainingChart'
 import SettingsTab from '../components/tabs/SettingsTab'
+import ActivitiesTab from '../components/tabs/ActivitiesTab'
+import WeeklyActivitiesWidget from '../components/features/WeeklyActivitiesWidget'
 import ReadinessScore from '../components/features/ReadinessScore'
 import WorkoutSuggestion from '../components/features/WorkoutSuggestion'
 import OverloadTracker from '../components/features/OverloadTracker'
@@ -54,14 +56,15 @@ import {
   fmtSleep, fmt, fmtCadence,
 } from '../utils/metrics'
 
-type MainView = 'overview' | 'training' | 'health' | 'running' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
+type MainView = 'overview' | 'training' | 'health' | 'running' | 'activities' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
+const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'activities', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⊞' },
   { id: 'training', label: 'Training', icon: '▲' },
   { id: 'health', label: 'Health', icon: '♥' },
   { id: 'running', label: 'Running', icon: '👟' },
+  { id: 'activities', label: 'Activities', icon: '🏋️' },
   { id: 'trends', label: 'Trends', icon: '📈' },
   { id: 'log', label: 'Log', icon: '📝' },
   { id: 'gear', label: 'Gear', icon: '🏷' },
@@ -150,6 +153,7 @@ export default function LayoutE_ThreePanel() {
             </div>
           ),
           calendar_heatmap: snapshots.length > 0 ? <CalendarHeatmap snapshots={snapshots} /> : null,
+          weekly_activities: <WeeklyActivitiesWidget />,
         }
         return (
           <div className="space-y-6">
@@ -340,6 +344,9 @@ export default function LayoutE_ThreePanel() {
             </div>
           </div>
         )
+
+      case 'activities':
+        return <ActivitiesTab />
 
       case 'gear':
         return <GearTracker />

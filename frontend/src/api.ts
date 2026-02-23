@@ -4,7 +4,7 @@ import type {
   ProjectionsResponse, DetrainingResponse, WeeklySummary, AdherenceReport,
   PersonalRecord, Note, StravaStatus, ReadinessScoreData, WorkoutSuggestionData,
   OverloadResponse, TrainingZonesData, HrDriftData, SleepInsightsData, TaperData,
-  GearItem, HealthEvent, AnnotationItem
+  GearItem, HealthEvent, AnnotationItem, WeeklyActivitiesData
 } from './types'
 import { getCached, setCached, deleteCached, clearCache } from './idb'
 
@@ -152,6 +152,10 @@ export async function fetchReadiness(): Promise<ReadinessScoreData> {
 
 export async function fetchWorkoutSuggestion(): Promise<WorkoutSuggestionData> {
   return cachedGet('/api/analytics/workout-suggestion')
+}
+
+export async function fetchWeeklyActivities(days = 7): Promise<WeeklyActivitiesData> {
+  return cachedGet(`/api/activities/weekly?days=${days}`)
 }
 
 export async function fetchOverload(): Promise<OverloadResponse> {

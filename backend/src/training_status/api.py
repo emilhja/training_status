@@ -688,14 +688,74 @@ def get_workout_suggestion() -> dict[str, Any]:
 
     db = get_db()
     rows = db.get_snapshots_for_analytics(
-        columns=["tsb", "sleep_score", "rest_days", "week_0_km", "week_1_km"], limit=1
+        columns=["recorded_at", "tsb", "sleep_score", "rest_days", "week_0_km", "week_1_km"], limit=1
     )
     tsb = sleep_score = rest_days = week_change_pct = None
+    data_age_hours: int | None = None
     if rows:
-        tsb, sleep_score, rest_days, w0, w1 = rows[0]
+        recorded_at_raw, tsb, sleep_score, rest_days, w0, w1 = rows[0]
         if w0 is not None and w1 is not None and w1 > 0:
             week_change_pct = ((w0 - w1) / w1) * 100
-    return suggest_workout(tsb, sleep_score, rest_days, dt.now().weekday(), week_change_pct)
+        if recorded_at_raw is not None:
+            try:
+                from datetime import date
+                recorded_at = dt.fromisoformat(str(recorded_at_raw).replace(" ", "T"))
+                age_seconds = (dt.now() - recorded_at.replace(tzinfo=None)).total_seconds()
+                data_age_hours = max(0, round(age_seconds / 3600))
+                snapshot_age_days = (date.today() - recorded_at.date()).days
+                if rest_days is not None and snapshot_age_days > 0:
+                    rest_days += snapshot_age_days
+            except (ValueError, TypeError):
+                pass
+    result = suggest_workout(tsb, sleep_score, rest_days, dt.now().weekday(), week_change_pct)
+    result["data_age_hours"] = data_age_hours
+    return result
+
+
+@app.get("/api/activities/weekly")
+def get_weekly_activities(days: int = Query(default=7, ge=1, le=120)) -> dict[str, Any]:
+    """Fetch recent activities from Intervals.icu grouped by sport type."""
+    from datetime import date, timedelta
+    from .services import IntervalsClient
+
+    settings = get_settings()
+    client = IntervalsClient(settings)
+    today = date.today()
+    week_ago = (today - timedelta(days=days - 1)).isoformat()
+
+    try:
+        acts = client._get("activities", params={"oldest": week_ago, "newest": today.isoformat()})
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to fetch activities: {e}")
+
+    if not isinstance(acts, list):
+        acts = []
+
+    by_type: dict[str, dict] = {}
+    activity_list = []
+
+    for a in acts:
+        t = a.get("type") or "Unknown"
+        if t not in by_type:
+            by_type[t] = {"type": t, "count": 0, "total_minutes": 0, "total_km": 0.0}
+        by_type[t]["count"] += 1
+        by_type[t]["total_minutes"] += round((a.get("moving_time") or 0) / 60)
+        by_type[t]["total_km"] = round(by_type[t]["total_km"] + (a.get("distance") or 0) / 1000, 1)
+
+        activity_list.append({
+            "id": a.get("id"),
+            "date": (a.get("start_date_local") or "")[:10],
+            "type": t,
+            "name": a.get("name") or t,
+            "distance_km": round((a.get("distance") or 0) / 1000, 1),
+            "duration_min": round((a.get("moving_time") or 0) / 60),
+            "load": a.get("icu_training_load"),
+        })
+
+    return {
+        "summary": sorted(by_type.values(), key=lambda x: x["count"], reverse=True),
+        "activities": sorted(activity_list, key=lambda x: x["date"], reverse=True),
+    }
 
 
 @app.get("/api/analytics/overload", response_model=OverloadResponse)

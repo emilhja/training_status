@@ -23,6 +23,12 @@ export default function WorkoutSuggestion() {
     rest: '🛌', done: '✅', easy: '🚶', long: '🏃', tempo: '⚡', interval: '🔥',
   }
 
+  const ageH = data.data_age_hours
+  const isStale = ageH !== undefined && ageH >= 12
+  const ageLabel = ageH !== undefined
+    ? ageH < 24 ? `${ageH}h ago` : `${Math.round(ageH / 24)}d ago`
+    : null
+
   return (
     <div className={`bg-gray-900 rounded-xl p-4 border ${borderColor[data.color] ?? 'border-gray-800'}`}>
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Today's Workout</h3>
@@ -38,6 +44,11 @@ export default function WorkoutSuggestion() {
           )}
         </div>
       </div>
+      {isStale && (
+        <p className="mt-3 text-xs text-gray-500 border-t border-gray-800 pt-2">
+          Last synced {ageLabel} — refresh if you've already trained today.
+        </p>
+      )}
     </div>
   )
 }

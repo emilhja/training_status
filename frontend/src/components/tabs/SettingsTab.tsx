@@ -64,7 +64,7 @@ function ReminderSettings() {
 
   return (
     <>
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">Daily Reminder</h2>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">Daily Reminder</h3>
       <div className="bg-gray-900 rounded-xl p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -167,7 +167,7 @@ export default function SettingsTab() {
 
   return (
     <div className="max-w-xl">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Running Targets</h2>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Running Targets</h3>
 
       {error && (
         <p className="text-sm text-red-400 mb-4">{error}</p>
@@ -254,7 +254,7 @@ export default function SettingsTab() {
 
       {/* Strength Training Target */}
       <div className="mt-10 border-t border-gray-800 pt-6">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Strength Training</h2>
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Strength Training</h3>
         {(() => {
           const type: GoalType = 'weekly_weightlifting_sessions'
           const goal = activeGoal(type)

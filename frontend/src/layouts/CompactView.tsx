@@ -41,7 +41,7 @@ function CompactMetric({ label, value, unit, status = 'neutral', sub }: CompactM
   )
 }
 
-export default function LayoutB_CompactDashboard() {
+export default function CompactView() {
   const { data: s, loading, error } = useLatestSnapshot()
   const { data: historyData } = useSnapshots(90)
   const snapshots = historyData ? [...historyData.items].reverse() : []

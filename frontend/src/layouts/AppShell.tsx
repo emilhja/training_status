@@ -1,5 +1,4 @@
-// Layout E: Three-Panel Layout
-// Header with menu, left sidebar for navigation, main content, and right sidebar for quick stats
+// AppShell: root layout — header, left sidebar, main content area, right sidebar (quick stats)
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect } from 'react'
@@ -11,8 +10,8 @@ import TrainingLoadChart from '../components/charts/TrainingLoadChart'
 import HrvChart from '../components/charts/HrvChart'
 import WeeklyKmChart from '../components/charts/WeeklyKmChart'
 import Vo2maxChart from '../components/charts/Vo2maxChart'
-import LayoutB_CompactDashboard from './LayoutB_CompactDashboard'
-import LayoutC_Accordion from './LayoutC_Accordion'
+import CompactView from './CompactView'
+import AccordionView from './AccordionView'
 import GoalProgress from '../components/features/GoalProgress'
 import ConsistencyScore from '../components/features/ConsistencyScore'
 import RecoveryRecommendation from '../components/features/RecoveryRecommendation'
@@ -73,7 +72,7 @@ const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ]
 
-export default function LayoutE_ThreePanel() {
+export default function AppShell() {
   const { view } = useParams<{ view: string }>()
   const navigate = useNavigate()
   const [leftCollapsed, setLeftCollapsed] = useState(false)
@@ -133,10 +132,10 @@ export default function LayoutE_ThreePanel() {
           goal_adherence: <GoalAdherence />,
           metric_cards: (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} />
-              <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} />
-              <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" />
-              <MetricCard label="HRV" value={fmt(s.hrv, 0)} unit="ms" />
+              <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} glossaryKey="ctl" />
+              <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} glossaryKey="tsb" />
+              <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" glossaryKey="resting_hr" />
+              <MetricCard label="HRV" value={fmt(s.hrv, 0)} unit="ms" glossaryKey="hrv" />
             </div>
           ),
           compare_consistency: (
@@ -172,12 +171,12 @@ export default function LayoutE_ThreePanel() {
             <InjuryRiskPanel />
             
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} />
-              <MetricCard label="Fatigue (ATL)" value={fmt(s.atl)} status={atlStatus(s.atl, s.ctl)} />
-              <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} />
-              <MetricCard label="Workload (A:C)" value={fmt(s.ac_ratio, 2)} status={acStatus(s.ac_ratio)} />
-              <MetricCard label="Monotony" value={fmt(s.monotony, 2)} />
-              <MetricCard label="Training Strain" value={s.training_strain ?? '—'} />
+              <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} glossaryKey="ctl" />
+              <MetricCard label="Fatigue (ATL)" value={fmt(s.atl)} status={atlStatus(s.atl, s.ctl)} glossaryKey="atl" />
+              <MetricCard label="Form (TSB)" value={fmt(s.tsb)} status={tsbStatus(s.tsb)} sub={tsbZone(s.tsb)} glossaryKey="tsb" />
+              <MetricCard label="Workload (A:C)" value={fmt(s.ac_ratio, 2)} status={acStatus(s.ac_ratio)} glossaryKey="ac_ratio" />
+              <MetricCard label="Monotony" value={fmt(s.monotony, 2)} glossaryKey="monotony" />
+              <MetricCard label="Training Strain" value={s.training_strain ?? '—'} glossaryKey="training_strain" />
             </div>
 
             {/* Progressive Overload */}
@@ -215,7 +214,7 @@ export default function LayoutE_ThreePanel() {
                   {s.elevation_gain_m !== null && <MetricCard label="Elevation" value={fmt(s.elevation_gain_m)} unit="m" />}
                   {s.avg_cadence !== null && <MetricCard label="Cadence" value={fmtCadence(s.avg_cadence)} unit="spm" />}
                   {s.max_hr !== null && <MetricCard label="Max HR" value={s.max_hr} unit="bpm" />}
-                  {s.icu_rpe !== null && <MetricCard label="RPE" value={s.icu_rpe} unit="/10" />}
+                  {s.icu_rpe !== null && <MetricCard label="RPE" value={s.icu_rpe} unit="/10" glossaryKey="rpe" />}
                 </div>
               </div>
             )}
@@ -241,24 +240,24 @@ export default function LayoutE_ThreePanel() {
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" />
-              <MetricCard label="HRV (RMSSD)" value={fmt(s.hrv, 0)} unit="ms" />
-              {s.hrv_sdnn !== null && <MetricCard label="HRV (SDNN)" value={fmt(s.hrv_sdnn, 0)} unit="ms" />}
+              <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" glossaryKey="resting_hr" />
+              <MetricCard label="HRV (RMSSD)" value={fmt(s.hrv, 0)} unit="ms" glossaryKey="hrv" />
+              {s.hrv_sdnn !== null && <MetricCard label="HRV (SDNN)" value={fmt(s.hrv_sdnn, 0)} unit="ms" glossaryKey="hrv" />}
               <MetricCard label="Sleep" value={fmtSleep(s.sleep_secs)} status={sleepStatus(s.sleep_quality)}
-                          sub={s.sleep_score ? `${Math.round(s.sleep_score)}/100` : undefined} />
-              <MetricCard label="VO2max" value={s.vo2max ?? '—'} />
+                          sub={s.sleep_score ? `${Math.round(s.sleep_score)}/100` : undefined} glossaryKey="sleep" />
+              <MetricCard label="VO2max" value={s.vo2max ?? '—'} glossaryKey="vo2max" />
               <MetricCard label="Steps" value={s.steps?.toLocaleString() ?? '—'} />
-              {s.spo2 !== null && <MetricCard label="SpO2" value={s.spo2} unit="%" />}
+              {s.spo2 !== null && <MetricCard label="SpO2" value={s.spo2} unit="%" glossaryKey="spo2" />}
             </div>
             
             {(s.stress !== null || s.readiness !== null || s.weight !== null || s.body_fat !== null) && (
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Wellness (Garmin/Intervals)</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {s.stress !== null && <MetricCard label="Stress" value={s.stress} unit="/100" />}
-                  {s.readiness !== null && <MetricCard label="Readiness" value={s.readiness} unit="/100" />}
-                  {s.weight !== null && <MetricCard label="Weight" value={fmt(s.weight)} unit="kg" />}
-                  {s.body_fat !== null && <MetricCard label="Body Fat" value={fmt(s.body_fat)} unit="%" />}
+                  {s.stress !== null && <MetricCard label="Stress" value={s.stress} unit="/100" glossaryKey="stress" />}
+                  {s.readiness !== null && <MetricCard label="Readiness" value={s.readiness} unit="/100" glossaryKey="readiness" />}
+                  {s.weight !== null && <MetricCard label="Weight" value={fmt(s.weight)} unit="kg" glossaryKey="weight" />}
+                  {s.body_fat !== null && <MetricCard label="Body Fat" value={fmt(s.body_fat)} unit="%" glossaryKey="body_fat" />}
                 </div>
               </div>
             )}
@@ -267,10 +266,10 @@ export default function LayoutE_ThreePanel() {
               <div className="bg-gray-900 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Subjective Wellness</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {s.mood !== null && <MetricCard label="Mood" value={s.mood} unit="/5" status={subjectiveStatus(s.mood)} />}
-                  {s.motivation !== null && <MetricCard label="Motivation" value={s.motivation} unit="/5" status={subjectiveStatus(s.motivation)} />}
-                  {s.fatigue !== null && <MetricCard label="Fatigue" value={s.fatigue} unit="/5" status={subjectiveStatus(s.fatigue) === 'good' ? 'bad' : subjectiveStatus(s.fatigue) === 'bad' ? 'good' : 'ok'} />}
-                  {s.soreness !== null && <MetricCard label="Soreness" value={s.soreness} unit="/5" status={subjectiveStatus(s.soreness) === 'good' ? 'bad' : subjectiveStatus(s.soreness) === 'bad' ? 'good' : 'ok'} />}
+                  {s.mood !== null && <MetricCard label="Mood" value={s.mood} unit="/5" status={subjectiveStatus(s.mood)} glossaryKey="mood" />}
+                  {s.motivation !== null && <MetricCard label="Motivation" value={s.motivation} unit="/5" status={subjectiveStatus(s.motivation)} glossaryKey="motivation" />}
+                  {s.fatigue !== null && <MetricCard label="Fatigue" value={s.fatigue} unit="/5" status={subjectiveStatus(s.fatigue) === 'good' ? 'bad' : subjectiveStatus(s.fatigue) === 'bad' ? 'good' : 'ok'} glossaryKey="fatigue" />}
+                  {s.soreness !== null && <MetricCard label="Soreness" value={s.soreness} unit="/5" status={subjectiveStatus(s.soreness) === 'good' ? 'bad' : subjectiveStatus(s.soreness) === 'bad' ? 'good' : 'ok'} glossaryKey="soreness" />}
                 </div>
               </div>
             )}
@@ -384,10 +383,10 @@ export default function LayoutE_ThreePanel() {
         )
 
       case 'compact':
-        return <LayoutB_CompactDashboard />
+        return <CompactView />
 
       case 'accordion':
-        return <LayoutC_Accordion />
+        return <AccordionView />
 
       case 'settings':
         return <SettingsTab />

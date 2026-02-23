@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import LayoutE_ThreePanel from './layouts/LayoutE_ThreePanel'
+import AppShell from './layouts/AppShell'
 import SharedView from './components/SharedView'
 
 export default function App() {
@@ -8,7 +8,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/overview" replace />} />
         <Route path="/shared/:token" element={<SharedView />} />
-        <Route path="/:view" element={<LayoutE_ThreePanel />} />
+        <Route path="/:view" element={<AppShell />} />
       </Routes>
     </BrowserRouter>
   )

@@ -51,7 +51,7 @@ function AccordionSection({ title, icon, isOpen, onToggle, children, summary }: 
   )
 }
 
-export default function LayoutC_Accordion() {
+export default function AccordionView() {
   const [openSections, setOpenSections] = useState<string[]>(['training'])
   const { data: s, loading, error } = useLatestSnapshot()
   const { data: historyData } = useSnapshots(90)

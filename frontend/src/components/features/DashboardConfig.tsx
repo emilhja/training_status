@@ -18,6 +18,7 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'correlation_insights', visible: true },
   { id: 'training_load_chart', visible: true },
   { id: 'calendar_heatmap', visible: true },
+  { id: 'hrv_overview', visible: true },
 ]
 
 const WIDGET_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ const WIDGET_LABELS: Record<string, string> = {
   training_load_chart: 'Training Load Chart',
   calendar_heatmap: 'Calendar Heatmap',
   weekly_activities: 'This Week (Run & Lift)',
+  hrv_overview: 'HRV Overview',
 }
 
 export function loadDashboardConfig(): DashboardWidget[] {

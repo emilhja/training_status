@@ -39,6 +39,7 @@ import DetrainingChart from '../components/charts/DetrainingChart'
 import SettingsTab from '../components/tabs/SettingsTab'
 import ActivitiesTab from '../components/tabs/ActivitiesTab'
 import WeeklyActivitiesWidget from '../components/features/WeeklyActivitiesWidget'
+import HrvOverviewWidget from '../components/features/HrvOverviewWidget'
 import ReadinessScore from '../components/features/ReadinessScore'
 import WorkoutSuggestion from '../components/features/WorkoutSuggestion'
 import OverloadTracker from '../components/features/OverloadTracker'
@@ -153,6 +154,7 @@ export default function AppShell() {
           ),
           calendar_heatmap: snapshots.length > 0 ? <CalendarHeatmap snapshots={snapshots} /> : null,
           weekly_activities: <WeeklyActivitiesWidget />,
+          hrv_overview: snapshots.length > 0 ? <HrvOverviewWidget snapshots={snapshots} /> : null,
         }
         return (
           <div className="space-y-6">

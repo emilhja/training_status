@@ -80,17 +80,18 @@ export default function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
+  const { data: s, loading, error, refetch } = useLatestSnapshot()
+  const { data: historyData, refetch: refetchHistory } = useSnapshots(90)
+
   async function handleRefresh() {
     setRefreshing(true)
     try {
       await triggerFetch()
+      await Promise.all([refetch(), refetchHistory()])
     } finally {
-      refetch()
       setRefreshing(false)
     }
   }
-  const { data: s, loading, error, refetch } = useLatestSnapshot()
-  const { data: historyData } = useSnapshots(90)
   const snapshots = historyData ? [...historyData.items].reverse() : []
 
   // Validate view and redirect if invalid

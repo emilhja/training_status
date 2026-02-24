@@ -24,7 +24,7 @@ export default function HrDriftAnalysis() {
       </div>
       <p className="text-sm text-gray-400 mb-3">{data.message}</p>
       {data.points.length > 2 && (
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={200} minWidth={0}>
           <LineChart data={[...data.points].reverse()}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} />

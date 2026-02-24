@@ -8,6 +8,18 @@ import type {
 } from './types'
 import { getCached, setCached, deleteCached, clearCache } from './idb'
 
+const CACHE_KEYS = {
+  LATEST:             '/api/snapshots/latest',
+  SNAPSHOTS:          (limit: number) => `/api/snapshots?limit=${limit}`,
+  NOTES:              (limit = 50) => `/api/notes?limit=${limit}`,
+  GOALS:              '/api/goals',
+  GEAR:               '/api/gear',
+  HEALTH_EVENTS:      '/api/health-events',
+  ANNOTATIONS:        '/api/annotations',
+  ANNOTATIONS_METRIC: (metric: string) => `/api/annotations?metric=${metric}`,
+  REPORTS:            '/api/reports',
+} as const
+
 /**
  * Network-first GET with IndexedDB fallback.
  * On success: caches response in IDB and returns it.
@@ -29,11 +41,11 @@ async function cachedGet<T>(url: string): Promise<T> {
 }
 
 export async function fetchLatest(): Promise<Snapshot> {
-  return cachedGet('/api/snapshots/latest')
+  return cachedGet(CACHE_KEYS.LATEST)
 }
 
 export async function fetchSnapshots(limit = 90): Promise<SnapshotsResponse> {
-  return cachedGet(`/api/snapshots?limit=${limit}`)
+  return cachedGet(CACHE_KEYS.SNAPSHOTS(limit))
 }
 
 export async function triggerFetch(): Promise<FetchResult> {
@@ -46,7 +58,7 @@ export async function triggerFetch(): Promise<FetchResult> {
 
 // Goals API
 export async function fetchGoals(): Promise<{ items: Goal[] }> {
-  return cachedGet('/api/goals')
+  return cachedGet(CACHE_KEYS.GOALS)
 }
 
 export async function createGoal(goal_type: string, target_value: number, period_start?: string): Promise<{ success: boolean }> {
@@ -56,14 +68,14 @@ export async function createGoal(goal_type: string, target_value: number, period
     body: JSON.stringify({ goal_type, target_value, period_start: period_start ?? null }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/goals')
+  await deleteCached(CACHE_KEYS.GOALS)
   return res.json()
 }
 
 export async function deleteGoal(goalId: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/goals')
+  await deleteCached(CACHE_KEYS.GOALS)
   return res.json()
 }
 
@@ -119,7 +131,7 @@ export async function fetchPersonalRecords(): Promise<{ records: PersonalRecord[
 }
 
 export async function fetchNotes(limit = 50): Promise<{ items: Note[] }> {
-  return cachedGet(`/api/notes?limit=${limit}`)
+  return cachedGet(CACHE_KEYS.NOTES(limit))
 }
 
 export async function createNote(note_date: string, content: string): Promise<{ success: boolean }> {
@@ -129,14 +141,14 @@ export async function createNote(note_date: string, content: string): Promise<{ 
     body: JSON.stringify({ note_date, content }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/notes?limit=50')
+  await deleteCached(CACHE_KEYS.NOTES())
   return res.json()
 }
 
 export async function deleteNote(noteId: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/notes?limit=50')
+  await deleteCached(CACHE_KEYS.NOTES())
   return res.json()
 }
 
@@ -181,7 +193,7 @@ export async function fetchTaper(raceDate: string, model = 'exponential'): Promi
 // --- Gear APIs ---
 
 export async function fetchGear(): Promise<{ items: GearItem[] }> {
-  return cachedGet('/api/gear')
+  return cachedGet(CACHE_KEYS.GEAR)
 }
 
 export async function createGear(data: { name: string; gear_type: string; brand?: string; purchase_date?: string; retirement_km: number }): Promise<{ success: boolean }> {
@@ -190,7 +202,7 @@ export async function createGear(data: { name: string; gear_type: string; brand?
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/gear')
+  await deleteCached(CACHE_KEYS.GEAR)
   return res.json()
 }
 
@@ -200,21 +212,21 @@ export async function updateGear(id: number, data: Record<string, unknown>): Pro
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/gear')
+  await deleteCached(CACHE_KEYS.GEAR)
   return res.json()
 }
 
 export async function deleteGear(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/gear/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/gear')
+  await deleteCached(CACHE_KEYS.GEAR)
   return res.json()
 }
 
 // --- Health Events APIs ---
 
 export async function fetchHealthEvents(): Promise<{ items: HealthEvent[] }> {
-  return cachedGet('/api/health-events')
+  return cachedGet(CACHE_KEYS.HEALTH_EVENTS)
 }
 
 export async function createHealthEvent(data: { event_date: string; end_date?: string; event_type: string; description: string; tags?: string }): Promise<{ success: boolean }> {
@@ -223,21 +235,21 @@ export async function createHealthEvent(data: { event_date: string; end_date?: s
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/health-events')
+  await deleteCached(CACHE_KEYS.HEALTH_EVENTS)
   return res.json()
 }
 
 export async function deleteHealthEvent(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/health-events/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/health-events')
+  await deleteCached(CACHE_KEYS.HEALTH_EVENTS)
   return res.json()
 }
 
 // --- Annotations APIs ---
 
 export async function fetchAnnotations(metric?: string): Promise<{ items: AnnotationItem[] }> {
-  const url = metric ? `/api/annotations?metric=${metric}` : '/api/annotations'
+  const url = metric ? CACHE_KEYS.ANNOTATIONS_METRIC(metric) : CACHE_KEYS.ANNOTATIONS
   return cachedGet(url)
 }
 
@@ -247,14 +259,14 @@ export async function createAnnotation(data: { annotation_date: string; metric: 
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/annotations')
+  await deleteCached(CACHE_KEYS.ANNOTATIONS)
   return res.json()
 }
 
 export async function deleteAnnotation(id: number): Promise<{ success: boolean }> {
   const res = await fetch(`/api/annotations/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/annotations')
+  await deleteCached(CACHE_KEYS.ANNOTATIONS)
   return res.json()
 }
 
@@ -276,12 +288,12 @@ export async function fetchSharedView(token: string): Promise<Record<string, unk
 // --- Reports APIs ---
 
 export async function fetchReports(): Promise<{ reports: string[] }> {
-  return cachedGet('/api/reports')
+  return cachedGet(CACHE_KEYS.REPORTS)
 }
 
 export async function generateReport(): Promise<{ success: boolean }> {
   const res = await fetch('/api/reports/generate', { method: 'POST' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await deleteCached('/api/reports')
+  await deleteCached(CACHE_KEYS.REPORTS)
   return res.json()
 }

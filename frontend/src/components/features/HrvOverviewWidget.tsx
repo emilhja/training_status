@@ -106,7 +106,7 @@ export default function HrvOverviewWidget({ snapshots }: Props) {
       <div className="border-t border-gray-800 pt-3">
         <p className="text-[10px] text-gray-600 mb-1">Last 4 weeks</p>
         <div className="h-12">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <LineChart data={trendData}>
               <YAxis domain={['auto', 'auto']} hide />
               <Tooltip

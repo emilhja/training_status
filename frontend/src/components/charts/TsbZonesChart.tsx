@@ -37,7 +37,7 @@ export default function TsbZonesChart({ snapshots }: Props) {
       <p className="text-xs text-gray-600 mb-4">
         Green = Fresh · Blue = Grey Zone · Red = Overreaching
       </p>
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={240} minWidth={0}>
         <ComposedChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />

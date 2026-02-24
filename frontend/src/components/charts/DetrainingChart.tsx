@@ -39,7 +39,7 @@ export default function DetrainingChart() {
         Detraining Estimator
       </h3>
       <p className="text-xs text-gray-600 mb-4">{data.message}</p>
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={240} minWidth={0}>
         <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis dataKey="week" tick={{ fill: '#9ca3af', fontSize: 11 }} />

@@ -7,10 +7,10 @@ export function useLatestSnapshot() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  const refetch = useCallback(() => {
+  const refetch = useCallback((): Promise<void> => {
     setLoading(true)
     setError(null)
-    fetchLatest()
+    return fetchLatest()
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

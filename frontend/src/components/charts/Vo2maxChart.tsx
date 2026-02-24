@@ -29,7 +29,7 @@ export default function Vo2maxChart({ snapshots }: Props) {
         </span>
       </div>
       
-      <ResponsiveContainer width="100%" height={150}>
+      <ResponsiveContainer width="100%" height={150} minWidth={0}>
         <LineChart data={data}>
           <XAxis 
             dataKey="date" 

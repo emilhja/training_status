@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -166,8 +167,28 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
+
+# --- Authentication ---
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def require_auth(key: str | None = Depends(_api_key_header)) -> None:
+    """Validate X-API-Key when APP_API_KEY is configured.
+
+    If APP_API_KEY is not set in .env, auth is disabled (open LAN mode).
+    """
+    expected = get_settings().app_api_key
+    if not expected:
+        return  # auth disabled
+    if not key or key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+# All /api/* routes (except /api/shared/{token}) are protected by require_auth.
+# /api/shared/{token} is registered directly on `app` below (public read-only).
+router = APIRouter(dependencies=[Depends(require_auth)])
 
 
 def row_to_dict(row: tuple) -> dict[str, Any]:
@@ -178,7 +199,7 @@ def row_to_dict(row: tuple) -> dict[str, Any]:
 # --- SNAPSHOT ENDPOINTS ---
 
 
-@app.get("/api/snapshots/latest", response_model=Snapshot)
+@router.get("/api/snapshots/latest", response_model=Snapshot)
 def get_latest() -> dict[str, Any]:
     """Get the most recent snapshot."""
     db = get_db()
@@ -188,7 +209,7 @@ def get_latest() -> dict[str, Any]:
     return row_to_dict(row)
 
 
-@app.get("/api/snapshots", response_model=SnapshotList)
+@router.get("/api/snapshots", response_model=SnapshotList)
 def get_snapshots(
     limit: int = Query(90, ge=1, le=1000), offset: int = Query(0, ge=0)
 ) -> dict[str, Any]:
@@ -198,7 +219,7 @@ def get_snapshots(
     return {"total": total, "items": [row_to_dict(r) for r in rows]}
 
 
-@app.post("/api/fetch", response_model=FetchResponse)
+@router.post("/api/fetch", response_model=FetchResponse)
 def trigger_fetch() -> dict[str, Any]:
     """Trigger a data fetch from external APIs."""
     global _last_fetch_time
@@ -235,7 +256,7 @@ def trigger_fetch() -> dict[str, Any]:
 # --- GOALS ENDPOINTS ---
 
 
-@app.get("/api/goals", response_model=GoalList)
+@router.get("/api/goals", response_model=GoalList)
 def get_goals() -> dict[str, Any]:
     """Get all active goals."""
     db = get_db()
@@ -243,7 +264,7 @@ def get_goals() -> dict[str, Any]:
     return {"items": [dict(r) for r in rows]}
 
 
-@app.post("/api/goals", response_model=SuccessResponse)
+@router.post("/api/goals", response_model=SuccessResponse)
 def create_goal(goal: GoalCreate) -> dict[str, Any]:
     """Create a new goal."""
     db = get_db()
@@ -253,7 +274,7 @@ def create_goal(goal: GoalCreate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.delete("/api/goals/{goal_id}", response_model=SuccessResponse)
+@router.delete("/api/goals/{goal_id}", response_model=SuccessResponse)
 def delete_goal(goal_id: int) -> dict[str, Any]:
     """Deactivate a goal."""
     db = get_db()
@@ -264,7 +285,7 @@ def delete_goal(goal_id: int) -> dict[str, Any]:
 # --- ANALYTICS ENDPOINTS ---
 
 
-@app.get("/api/analytics/consistency", response_model=ConsistencyScore)
+@router.get("/api/analytics/consistency", response_model=ConsistencyScore)
 def get_consistency_score() -> dict[str, Any]:
     """Calculate training consistency score (0-100)."""
     db = get_db()
@@ -287,7 +308,7 @@ def get_consistency_score() -> dict[str, Any]:
     return calculate_consistency_score(volumes, rest_days, monotony_values)
 
 
-@app.get("/api/analytics/recommendation", response_model=Recommendation)
+@router.get("/api/analytics/recommendation", response_model=Recommendation)
 def get_workout_recommendation() -> dict[str, Any]:
     """Get recovery/workout recommendation based on current state."""
     db = get_db()
@@ -307,7 +328,7 @@ def get_workout_recommendation() -> dict[str, Any]:
     return get_recommendation(tsb, hrv, resting_hr, sleep_score, fatigue)
 
 
-@app.get("/api/analytics/projections", response_model=ProjectionsResponse)
+@router.get("/api/analytics/projections", response_model=ProjectionsResponse)
 def get_projections() -> dict[str, Any]:
     """Project fitness/fatigue for next 7 days."""
     db = get_db()
@@ -328,7 +349,7 @@ def get_projections() -> dict[str, Any]:
     }
 
 
-@app.get("/api/analytics/injury-risk", response_model=InjuryRisk)
+@router.get("/api/analytics/injury-risk", response_model=InjuryRisk)
 def get_injury_risk() -> dict[str, Any]:
     """Calculate injury risk score based on multiple factors."""
     db = get_db()
@@ -349,7 +370,7 @@ def get_injury_risk() -> dict[str, Any]:
     return calculate_injury_risk(rows)
 
 
-@app.get("/api/analytics/correlations", response_model=CorrelationsResponse)
+@router.get("/api/analytics/correlations", response_model=CorrelationsResponse)
 def get_correlations() -> dict[str, Any]:
     """Find correlations in training data."""
     db = get_db()
@@ -370,7 +391,7 @@ def get_correlations() -> dict[str, Any]:
     return calculate_correlations(main_rows, rest_rows)
 
 
-@app.get("/api/analytics/race-predictor", response_model=RacePredictorResponse)
+@router.get("/api/analytics/race-predictor", response_model=RacePredictorResponse)
 def get_race_prediction() -> dict[str, Any]:
     """Predict race times based on critical speed and recent training."""
     db = get_db()
@@ -407,7 +428,7 @@ def get_race_prediction() -> dict[str, Any]:
 # --- DETRAINING ENDPOINT ---
 
 
-@app.get("/api/analytics/detraining", response_model=DetrainingResponse)
+@router.get("/api/analytics/detraining", response_model=DetrainingResponse)
 def get_detraining() -> dict[str, Any]:
     """Estimate fitness/fatigue decay if training stops today."""
     db = get_db()
@@ -440,7 +461,7 @@ def get_detraining() -> dict[str, Any]:
 # --- WEEKLY SUMMARY ENDPOINT ---
 
 
-@app.get("/api/analytics/summary", response_model=WeeklySummary)
+@router.get("/api/analytics/summary", response_model=WeeklySummary)
 def get_weekly_summary() -> dict[str, Any]:
     """Get a 7-day training digest vs the previous 7 days."""
     db = get_db()
@@ -453,7 +474,7 @@ def get_weekly_summary() -> dict[str, Any]:
 # --- GOAL ADHERENCE ENDPOINT ---
 
 
-@app.get("/api/analytics/adherence", response_model=list[AdherenceReport])
+@router.get("/api/analytics/adherence", response_model=list[AdherenceReport])
 def get_goal_adherence() -> list[dict[str, Any]]:
     """Show adherence history for active weekly_km goals."""
     db = get_db()
@@ -476,7 +497,7 @@ def get_goal_adherence() -> list[dict[str, Any]]:
 # --- PERSONAL RECORDS ENDPOINTS ---
 
 
-@app.get("/api/personal-records", response_model=PersonalRecordsResponse)
+@router.get("/api/personal-records", response_model=PersonalRecordsResponse)
 def get_personal_records() -> dict[str, Any]:
     """Get all detected personal records."""
     db = get_db()
@@ -487,7 +508,7 @@ def get_personal_records() -> dict[str, Any]:
 # --- TRAINING NOTES ENDPOINTS ---
 
 
-@app.get("/api/notes", response_model=NoteList)
+@router.get("/api/notes", response_model=NoteList)
 def get_notes(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
     """Get training log notes."""
     db = get_db()
@@ -495,7 +516,7 @@ def get_notes(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
     return {"items": [dict(r) for r in rows]}
 
 
-@app.post("/api/notes", response_model=SuccessResponse)
+@router.post("/api/notes", response_model=SuccessResponse)
 def create_note(note: NoteCreate) -> dict[str, Any]:
     """Add a training log note."""
     db = get_db()
@@ -503,7 +524,7 @@ def create_note(note: NoteCreate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.delete("/api/notes/{note_id}", response_model=SuccessResponse)
+@router.delete("/api/notes/{note_id}", response_model=SuccessResponse)
 def delete_note(note_id: int) -> dict[str, Any]:
     """Delete a training log note."""
     db = get_db()
@@ -514,7 +535,7 @@ def delete_note(note_id: int) -> dict[str, Any]:
 # --- STRAVA STATUS ENDPOINT ---
 
 
-@app.get("/api/strava/status", response_model=StravaStatus)
+@router.get("/api/strava/status", response_model=StravaStatus)
 def get_strava_status() -> dict[str, Any]:
     """Check if Strava integration is configured."""
     settings = get_settings()
@@ -537,7 +558,7 @@ def get_strava_status() -> dict[str, Any]:
 # --- EXPORT ENDPOINTS ---
 
 
-@app.get("/api/export/json")
+@router.get("/api/export/json")
 def export_json() -> JSONResponse:
     """Export all snapshots as JSON."""
     db = get_db()
@@ -546,7 +567,7 @@ def export_json() -> JSONResponse:
     return JSONResponse(content={"snapshots": data})
 
 
-@app.get("/api/export/csv")
+@router.get("/api/export/csv")
 def export_csv() -> StreamingResponse:
     """Export all snapshots as CSV."""
     db = get_db()
@@ -567,7 +588,7 @@ def export_csv() -> StreamingResponse:
 # --- NEW ANALYTICS ENDPOINTS ---
 
 
-@app.get("/api/analytics/readiness", response_model=ReadinessScore)
+@router.get("/api/analytics/readiness", response_model=ReadinessScore)
 def get_readiness() -> dict[str, Any]:
     """Composite training readiness score 0-100."""
     db = get_db()
@@ -588,7 +609,7 @@ def get_readiness() -> dict[str, Any]:
     return calculate_readiness_score(tsb, hrv_trend_pct, sleep_score, fatigue, soreness)
 
 
-@app.get("/api/analytics/workout-suggestion", response_model=WorkoutSuggestion)
+@router.get("/api/analytics/workout-suggestion", response_model=WorkoutSuggestion)
 def get_workout_suggestion() -> dict[str, Any]:
     """Rule-based workout suggestion for today."""
     from datetime import datetime as dt
@@ -634,7 +655,7 @@ def get_workout_suggestion() -> dict[str, Any]:
     return result
 
 
-@app.get("/api/activities/weekly")
+@router.get("/api/activities/weekly")
 def get_weekly_activities(days: int = Query(default=7, ge=1, le=120)) -> dict[str, Any]:
     """Fetch recent activities from Intervals.icu grouped by sport type."""
     from datetime import date, timedelta
@@ -680,7 +701,7 @@ def get_weekly_activities(days: int = Query(default=7, ge=1, le=120)) -> dict[st
     }
 
 
-@app.get("/api/analytics/overload", response_model=OverloadResponse)
+@router.get("/api/analytics/overload", response_model=OverloadResponse)
 def get_overload() -> dict[str, Any]:
     """Progressive overload tracking - week-over-week volume changes."""
     db = get_db()
@@ -690,7 +711,7 @@ def get_overload() -> dict[str, Any]:
     return calculate_overload(rows)
 
 
-@app.get("/api/analytics/zones", response_model=TrainingZonesResponse)
+@router.get("/api/analytics/zones", response_model=TrainingZonesResponse)
 def get_training_zones() -> dict[str, Any]:
     """Compute HR and pace training zones."""
     db = get_db()
@@ -700,10 +721,28 @@ def get_training_zones() -> dict[str, Any]:
     if not rows:
         return {"hr_zones": [], "pace_zones": [], "data_quality": "none"}
     resting_hr, max_hr, critical_speed = rows[0]
-    return calculate_training_zones(resting_hr, max_hr, critical_speed)
+
+    # Fetch the athlete's configured HR zone boundaries and max HR directly from
+    # the most recent Intervals.icu activity — more accurate than Karvonen estimates.
+    from .services.intervals import IntervalsClient
+    from datetime import datetime, timedelta
+    icu_hr_zones: list[int] | None = None
+    try:
+        client = IntervalsClient(settings)
+        today = datetime.now().strftime("%Y-%m-%d")
+        week_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        acts = client._get("activities", params={"oldest": week_ago, "newest": today})
+        if acts:
+            latest = acts[0]
+            icu_hr_zones = latest.get("icu_hr_zones") or None
+            max_hr = latest.get("athlete_max_hr") or max_hr
+    except Exception:
+        pass
+
+    return calculate_training_zones(resting_hr, max_hr, critical_speed, icu_hr_zones)
 
 
-@app.get("/api/analytics/hr-drift", response_model=HrDriftResponse)
+@router.get("/api/analytics/hr-drift", response_model=HrDriftResponse)
 def get_hr_drift() -> dict[str, Any]:
     """HR zone drift analysis for easy sessions."""
     db = get_db()
@@ -717,7 +756,7 @@ def get_hr_drift() -> dict[str, Any]:
     return calculate_hr_drift(rows)
 
 
-@app.get("/api/analytics/sleep-insights", response_model=SleepInsightsResponse)
+@router.get("/api/analytics/sleep-insights", response_model=SleepInsightsResponse)
 def get_sleep_insights() -> dict[str, Any]:
     """Sleep optimization insights."""
     db = get_db()
@@ -727,7 +766,7 @@ def get_sleep_insights() -> dict[str, Any]:
     return calculate_sleep_insights(rows)
 
 
-@app.get("/api/analytics/taper", response_model=TaperResponse)
+@router.get("/api/analytics/taper", response_model=TaperResponse)
 def get_taper(
     race_date: str = Query(..., description="Race date YYYY-MM-DD"),
     model: str = Query("exponential", pattern=r"^(exponential|linear|step)$"),
@@ -742,14 +781,14 @@ def get_taper(
 # --- GEAR ENDPOINTS ---
 
 
-@app.get("/api/gear", response_model=GearList)
+@router.get("/api/gear", response_model=GearList)
 def get_gear() -> dict[str, Any]:
     """Get all active gear."""
     db = get_db()
     return {"items": [dict(r) for r in db.get_gear()]}
 
 
-@app.post("/api/gear", response_model=SuccessResponse)
+@router.post("/api/gear", response_model=SuccessResponse)
 def create_gear(gear: GearCreate) -> dict[str, Any]:
     """Add new gear."""
     db = get_db()
@@ -757,7 +796,7 @@ def create_gear(gear: GearCreate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.put("/api/gear/{gear_id}", response_model=SuccessResponse)
+@router.put("/api/gear/{gear_id}", response_model=SuccessResponse)
 def update_gear(gear_id: int, update: GearUpdate) -> dict[str, Any]:
     """Update gear details."""
     db = get_db()
@@ -765,7 +804,7 @@ def update_gear(gear_id: int, update: GearUpdate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.delete("/api/gear/{gear_id}", response_model=SuccessResponse)
+@router.delete("/api/gear/{gear_id}", response_model=SuccessResponse)
 def retire_gear(gear_id: int) -> dict[str, Any]:
     """Retire a gear item."""
     db = get_db()
@@ -776,14 +815,14 @@ def retire_gear(gear_id: int) -> dict[str, Any]:
 # --- HEALTH EVENTS ENDPOINTS ---
 
 
-@app.get("/api/health-events", response_model=HealthEventList)
+@router.get("/api/health-events", response_model=HealthEventList)
 def get_health_events() -> dict[str, Any]:
     """Get health event log."""
     db = get_db()
     return {"items": [dict(r) for r in db.get_health_events()]}
 
 
-@app.post("/api/health-events", response_model=SuccessResponse)
+@router.post("/api/health-events", response_model=SuccessResponse)
 def create_health_event(event: HealthEventCreate) -> dict[str, Any]:
     """Log an illness, injury, or rest period."""
     db = get_db()
@@ -792,7 +831,7 @@ def create_health_event(event: HealthEventCreate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.put("/api/health-events/{event_id}", response_model=SuccessResponse)
+@router.put("/api/health-events/{event_id}", response_model=SuccessResponse)
 def update_health_event(event_id: int, update: HealthEventUpdate) -> dict[str, Any]:
     """Update a health event."""
     db = get_db()
@@ -800,7 +839,7 @@ def update_health_event(event_id: int, update: HealthEventUpdate) -> dict[str, A
     return {"success": True}
 
 
-@app.delete("/api/health-events/{event_id}", response_model=SuccessResponse)
+@router.delete("/api/health-events/{event_id}", response_model=SuccessResponse)
 def delete_health_event(event_id: int) -> dict[str, Any]:
     """Delete a health event."""
     db = get_db()
@@ -811,14 +850,14 @@ def delete_health_event(event_id: int) -> dict[str, Any]:
 # --- ANNOTATION ENDPOINTS ---
 
 
-@app.get("/api/annotations", response_model=AnnotationList)
+@router.get("/api/annotations", response_model=AnnotationList)
 def get_annotations(metric: str | None = Query(None)) -> dict[str, Any]:
     """Get chart annotations."""
     db = get_db()
     return {"items": [dict(r) for r in db.get_annotations(metric=metric)]}
 
 
-@app.post("/api/annotations", response_model=SuccessResponse)
+@router.post("/api/annotations", response_model=SuccessResponse)
 def create_annotation(ann: AnnotationCreate) -> dict[str, Any]:
     """Add a chart annotation."""
     db = get_db()
@@ -826,7 +865,7 @@ def create_annotation(ann: AnnotationCreate) -> dict[str, Any]:
     return {"success": True}
 
 
-@app.delete("/api/annotations/{ann_id}", response_model=SuccessResponse)
+@router.delete("/api/annotations/{ann_id}", response_model=SuccessResponse)
 def delete_annotation(ann_id: int) -> dict[str, Any]:
     """Delete an annotation."""
     db = get_db()
@@ -837,7 +876,7 @@ def delete_annotation(ann_id: int) -> dict[str, Any]:
 # --- SHARED LINK ENDPOINTS ---
 
 
-@app.post("/api/share")
+@router.post("/api/share")
 def create_share_link(body: SharedLinkCreate) -> dict[str, Any]:
     """Create a read-only shared link."""
     import uuid
@@ -852,7 +891,7 @@ def create_share_link(body: SharedLinkCreate) -> dict[str, Any]:
     return {"token": token, "url": f"/shared/{token}", "expires_at": expires_at}
 
 
-@app.get("/api/share")
+@router.get("/api/share")
 def list_share_links() -> dict[str, Any]:
     """List all active share links."""
     db = get_db()
@@ -860,7 +899,7 @@ def list_share_links() -> dict[str, Any]:
     return {"items": [dict(link) for link in links]}
 
 
-@app.delete("/api/share/{token}", response_model=SuccessResponse)
+@router.delete("/api/share/{token}", response_model=SuccessResponse)
 def revoke_share_link(token: str) -> dict[str, Any]:
     """Revoke (deactivate) a share link by token."""
     db = get_db()
@@ -898,7 +937,7 @@ def get_shared_view(token: str) -> dict[str, Any]:
 # --- REPORT ENDPOINTS ---
 
 
-@app.get("/api/reports")
+@router.get("/api/reports")
 def list_reports() -> dict[str, Any]:
     """List available weekly PDF reports."""
     settings = get_settings()
@@ -908,7 +947,7 @@ def list_reports() -> dict[str, Any]:
     return {"reports": [p.name for p in pdfs]}
 
 
-@app.get("/api/reports/latest")
+@router.get("/api/reports/latest")
 def get_latest_report() -> FileResponse:
     """Download the most recent weekly PDF report."""
     settings = get_settings()
@@ -920,7 +959,7 @@ def get_latest_report() -> FileResponse:
     return FileResponse(str(pdfs[0]), media_type="application/pdf", filename=pdfs[0].name)
 
 
-@app.get("/api/reports/{filename}")
+@router.get("/api/reports/{filename}")
 def get_report(filename: str) -> FileResponse:
     """Download a specific report."""
     import re
@@ -934,7 +973,7 @@ def get_report(filename: str) -> FileResponse:
     return FileResponse(str(path), media_type="application/pdf", filename=filename)
 
 
-@app.post("/api/reports/generate", response_model=SuccessResponse)
+@router.post("/api/reports/generate", response_model=SuccessResponse)
 def generate_report_now() -> dict[str, Any]:
     """Generate a PDF report on demand."""
     from .services.reports import generate_weekly_pdf
@@ -943,6 +982,8 @@ def generate_report_now() -> dict[str, Any]:
     generate_weekly_pdf(get_db(), settings.reports_dir)
     return {"success": True}
 
+
+app.include_router(router)
 
 # Serve built frontend with SPA support
 if DIST_DIR.exists():

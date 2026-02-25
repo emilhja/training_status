@@ -74,6 +74,7 @@ export default function HealthEventLog() {
             <option value="rest_period">Rest Period</option>
           </select>
           <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What happened?"
+            maxLength={500}
             className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 resize-none h-16" />
           <button type="submit" className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded">Save</button>
         </form>

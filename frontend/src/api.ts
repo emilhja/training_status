@@ -26,26 +26,27 @@ const CACHE_KEYS = {
  * On failure: returns cached version from IDB (offline mode).
  * If no cache exists either, throws.
  */
-async function cachedGet<T>(url: string): Promise<T> {
+async function cachedGet<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, signal ? { signal } : undefined)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: T = await res.json()
     setCached(url, data) // fire-and-forget
     return data
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     const cached = await getCached<T>(url)
     if (cached !== null) return cached
     throw err
   }
 }
 
-export async function fetchLatest(): Promise<Snapshot> {
-  return cachedGet(CACHE_KEYS.LATEST)
+export async function fetchLatest(signal?: AbortSignal): Promise<Snapshot> {
+  return cachedGet(CACHE_KEYS.LATEST, signal)
 }
 
-export async function fetchSnapshots(limit = 90): Promise<SnapshotsResponse> {
-  return cachedGet(CACHE_KEYS.SNAPSHOTS(limit))
+export async function fetchSnapshots(limit = 90, signal?: AbortSignal): Promise<SnapshotsResponse> {
+  return cachedGet(CACHE_KEYS.SNAPSHOTS(limit), signal)
 }
 
 export async function triggerFetch(): Promise<FetchResult> {

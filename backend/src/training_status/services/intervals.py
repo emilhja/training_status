@@ -76,12 +76,36 @@ class IntervalsClient:
         response.raise_for_status()
         return cast(dict, response.json())
 
+    def get_athlete_max_hr(self) -> int | None:
+        """Fetch the athlete's physiological maximum heart rate from their profile.
+
+        Intervals.icu stores this as `maxHR` on the athlete object.
+        Falls back to a 220-age estimate if the profile has a date_of_birth.
+        """
+        try:
+            profile = self._get("")  # GET /athlete/{id}
+            max_hr = profile.get("maxHR") or profile.get("max_hr")
+            if max_hr:
+                return int(max_hr)
+            # Fallback: 220 - age estimate
+            dob = profile.get("dob") or profile.get("date_of_birth")
+            if dob:
+                birth_year = int(str(dob)[:4])
+                age = date.today().year - birth_year
+                return 220 - age
+        except Exception:
+            pass
+        return None
+
     def get_wellness(self) -> dict[str, Any]:
         """Get wellness data from Intervals.icu.
 
         Returns training load, HRV, sleep, and other health metrics.
         """
         raw: dict[str, Any] = {"wellness": {}, "pace_curves": {}, "activities": []}
+
+        # Fetch athlete profile max HR (physiological, not per-activity)
+        athlete_max_hr = self.get_athlete_max_hr()
 
         # Get wellness data
         wellness_list = self._get("wellness")
@@ -134,7 +158,7 @@ class IntervalsClient:
         result.update(self._calculate_critical_speed(raw))
 
         # Activity data for rest days, monotony, strain
-        result.update(self._get_activity_metrics(raw))
+        result.update(self._get_activity_metrics(raw, athlete_max_hr))
 
         result["_raw"] = raw
         return result
@@ -201,7 +225,7 @@ class IntervalsClient:
 
         return {"critical_speed": None, "d_prime": None}
 
-    def _get_activity_metrics(self, raw: dict) -> dict[str, Any]:
+    def _get_activity_metrics(self, raw: dict, athlete_max_hr: int | None = None) -> dict[str, Any]:
         """Calculate metrics from recent activities."""
         import statistics
 
@@ -258,7 +282,11 @@ class IntervalsClient:
         latest = acts[0]
         result["elevation_gain_m"] = latest.get("total_elevation_gain")
         result["avg_cadence"] = latest.get("average_cadence")
-        result["max_hr"] = latest.get("max_heartrate")
+        # athlete_max_hr is the athlete's configured physiological max HR in Intervals.icu
+        # (distinct from a single workout's peak). Use it for Karvonen zone calculations.
+        result["max_hr"] = latest.get("athlete_max_hr") or latest.get("max_heartrate")
+        # Store the configured HR zone boundaries for direct use in zone display
+        result["icu_hr_zones"] = latest.get("icu_hr_zones") or []
         result["icu_rpe"] = latest.get("icu_rpe")
         result["feel"] = latest.get("feel")
 

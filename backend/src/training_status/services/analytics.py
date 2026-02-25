@@ -761,10 +761,27 @@ def calculate_training_zones(
     resting_hr: int | None,
     max_hr: int | None,
     critical_speed: float | None,
+    icu_hr_zones: list[int] | None = None,
 ) -> dict:
-    """Compute HR zones (Karvonen) and pace zones from critical speed."""
+    """Compute HR zones and pace zones from critical speed.
+
+    If icu_hr_zones is provided (7-element boundary list from Intervals.icu),
+    those boundaries are used directly. Otherwise falls back to Karvonen.
+    """
     hr_zones = []
-    if resting_hr is not None and max_hr is not None:
+
+    # Use Intervals.icu configured zone boundaries when available (most accurate).
+    # icu_hr_zones = [Z1lo, Z2lo, Z3lo, Z4lo, Z5lo, Z6lo, max]
+    zone_names = ["Z1 Recovery", "Z2 Aerobic", "Z3 Tempo", "Z4 Threshold", "Z5 VO2max"]
+    if icu_hr_zones and len(icu_hr_zones) >= 6:
+        bounds = icu_hr_zones
+        for i, name in enumerate(zone_names):
+            hr_zones.append({
+                "zone": name,
+                "hr_low": bounds[i],
+                "hr_high": bounds[i + 1] - 1 if i + 1 < len(bounds) else bounds[i],
+            })
+    elif resting_hr is not None and max_hr is not None:
         hrr = max_hr - resting_hr
         zone_pcts = [
             ("Z1 Recovery", 0.50, 0.60),

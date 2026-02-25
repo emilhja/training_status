@@ -65,6 +65,7 @@ export default function TrainingLog() {
             onChange={(e) => setContent(e.target.value)}
             placeholder="How did you feel? What did you notice? Any notes about your training..."
             rows={3}
+            maxLength={2000}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
           />
           {error && <p className="text-red-400 text-xs">{error}</p>}
@@ -92,11 +93,11 @@ export default function TrainingLog() {
                 key={note.id}
                 className="flex gap-3 group border-b border-gray-800/50 pb-3 last:border-0 last:pb-0"
               >
-                <div className="flex-shrink-0 text-xs text-gray-500 pt-0.5 w-24">{note.note_date}</div>
+                <div className="shrink-0 text-xs text-gray-500 pt-0.5 w-24">{note.note_date}</div>
                 <p className="flex-1 text-sm text-gray-300 whitespace-pre-wrap">{note.content}</p>
                 <button
                   onClick={() => handleDelete(note.id)}
-                  className="flex-shrink-0 text-gray-700 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="shrink-0 text-gray-700 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Delete"
                 >
                   ✕

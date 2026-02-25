@@ -59,6 +59,7 @@ export default function GearTracker() {
       {adding && (
         <form onSubmit={handleAdd} className="bg-gray-900 rounded-xl p-4 space-y-3">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Name (e.g. Nike Vomero 18)"
+            maxLength={100}
             className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-200" />
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Brand (optional)"
             className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-200" />

@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
     api_timeout: int = 30
 
+    # Authentication
+    # Set APP_API_KEY in .env to protect all /api/* endpoints (except /api/shared/*).
+    # Leave unset (or empty) to run without auth (LAN-only trusted network).
+    app_api_key: str | None = None
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent.parent / ".env",
         "env_file_encoding": "utf-8",

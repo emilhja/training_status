@@ -2,16 +2,16 @@
 
 ## Planned Features (Priority Order)
 
-### 1. Security & Reliability Hardening
-- [ ] Add authentication (API key or basic auth) so LAN neighbours can't read/mutate data
-- [ ] Rate-limit `POST /api/fetch` to prevent accidental external API spam
-- [ ] Validate input lengths on all text fields (notes, gear, health events, annotations)
-- [ ] Remove duplicate SW API caching (already handled by IndexedDB layer)
-- [ ] Per-widget error boundaries so one broken widget can't crash the whole view
-- [ ] Lazy-load heavy chart/analytics components to improve PWA initial load
-- [ ] `AbortController` in hooks to avoid state updates on unmounted components
-- [ ] Expose share link revocation UI (list & revoke active shared links)
-- [ ] Move inline correlation logic in `api.py` into `analytics.py` for consistency
+### 1. Security & Reliability Hardening ✅
+- [x] Add authentication (API key or basic auth) so LAN neighbours can't read/mutate data
+- [x] Rate-limit `POST /api/fetch` to prevent accidental external API spam
+- [x] Validate input lengths on all text fields (notes, gear, health events, annotations)
+- [x] Remove duplicate SW API caching (already handled by IndexedDB layer)
+- [x] Per-widget error boundaries so one broken widget can't crash the whole view
+- [x] Lazy-load heavy chart/analytics components to improve PWA initial load
+- [x] `AbortController` in hooks to avoid state updates on unmounted components
+- [x] Expose share link revocation UI (list & revoke active shared links)
+- [x] Move inline correlation logic in `api.py` into `analytics.py` for consistency
 
 ### ~~5. PWA (Progressive Web App)~~ ✅
 - [x] Add service worker for offline mode

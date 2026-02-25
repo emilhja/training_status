@@ -24,7 +24,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback ?? (
-        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4 p-6">
+        <div className="flex flex-col items-center justify-center min-h-75 gap-4 p-6">
           <p className="text-red-400 text-sm">Something went wrong: {this.state.message}</p>
           <button
             onClick={() => window.location.reload()}

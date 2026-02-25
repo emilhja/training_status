@@ -615,18 +615,56 @@ def calculate_readiness_score(
     }
 
 
+def _done_description(today_activities: list[str] | None) -> str:
+    """Build context-aware description based on what was done today."""
+    if not today_activities:
+        return "Nice work! Consider resting or doing light mobility/stretching."
+
+    # Normalize activity types to lowercase for matching
+    lower = [a.lower() for a in today_activities]
+    did_run = any(t in ("run", "virtualrun", "treadmill", "trail running") for t in lower)
+    did_weights = any(t in ("weighttraining", "weight training", "strength", "gym") for t in lower)
+    did_ride = any(t in ("ride", "virtualride", "cycling") for t in lower)
+
+    labels = [a for a in today_activities if a.lower() != "unknown"]
+    done_str = ", ".join(labels) if labels else "a workout"
+
+    if did_weights and not did_run:
+        return (
+            f"You did {done_str} today. If you want to run, allow a longer rest "
+            "period and keep it easy — avoid heavy leg work right before running."
+        )
+    if did_run and not did_weights:
+        return (
+            f"You did {done_str} today. If you want to lift, focus on upper body "
+            "or light core work. Avoid heavy squats/deadlifts after a hard run."
+        )
+    if did_run and did_weights:
+        return (
+            f"You did {done_str} today — solid double session! "
+            "Consider resting or doing light mobility/stretching."
+        )
+    if did_ride:
+        return (
+            f"You did {done_str} today. If adding another session, "
+            "keep it low impact — light jog or upper body strength."
+        )
+    return f"You did {done_str} today. Nice work! Consider resting or doing light mobility/stretching."
+
+
 def suggest_workout(
     tsb: float | None,
     sleep_score: float | None,
     rest_days: int | None,
     day_of_week: int,
     week_change_pct: float | None,
+    today_activities: list[str] | None = None,
 ) -> dict:
     """Rule-based workout suggestion for today."""
     if rest_days is not None and rest_days == 0:
         return {
             "type": "done", "title": "You Already Trained Today",
-            "description": "Nice work! Consider resting or doing light mobility/stretching.",
+            "description": _done_description(today_activities),
             "duration_min": 0, "intensity": "none", "color": "green",
         }
     if tsb is not None and tsb < -20:
@@ -930,4 +968,127 @@ def calculate_taper(
         "current_ctl": current_ctl,
         "model": taper_model,
         "weeks": weeks,
+    }
+
+
+def calculate_correlations(
+    main_rows: list[tuple],
+    rest_rows: list[tuple],
+) -> dict:
+    """Find correlations in training data.
+
+    main_rows: tuples of (week_0_km, hrv, sleep_score, weather_temp, avg_cadence,
+               elevation_gain_m, icu_rpe, feel) — most recent first.
+    rest_rows: tuples of (rest_days, hrv) — most recent first.
+    """
+    insights = []
+
+    if len(main_rows) < 10:
+        return {
+            "insights": [],
+            "data_points": len(main_rows),
+            "message": "Need more data for correlation analysis",
+        }
+
+    volumes = [r[0] for r in main_rows if r[0] is not None]
+    hrvs = [r[1] for r in main_rows if r[1] is not None]
+    sleep_scores = [r[2] for r in main_rows if r[2] is not None]
+    temps = [r[3] for r in main_rows if r[3] is not None]
+
+    # Correlation 1: Volume vs HRV
+    if len(volumes) >= 10 and len(hrvs) >= 10:
+        high_vol_days = [i for i, v in enumerate(volumes) if v > 35]
+        low_vol_days = [i for i, v in enumerate(volumes) if v < 20]
+
+        if high_vol_days and low_vol_days:
+            high_vol_hrv = [hrvs[i] for i in high_vol_days if i < len(hrvs)]
+            low_vol_hrv = [hrvs[i] for i in low_vol_days if i < len(hrvs)]
+
+            if high_vol_hrv and low_vol_hrv:
+                avg_high = sum(high_vol_hrv) / len(high_vol_hrv)
+                avg_low = sum(low_vol_hrv) / len(low_vol_hrv)
+                diff_pct = ((avg_low - avg_high) / avg_high) * 100 if avg_high > 0 else 0
+
+                if diff_pct > 10:
+                    insights.append(
+                        {
+                            "type": "volume_recovery",
+                            "title": "High Volume Impact",
+                            "description": (
+                                f"Your HRV is {diff_pct:.0f}% lower after"
+                                " high volume weeks (>35km). Consider more recovery."
+                            ),
+                            "recommendation": "Schedule easier days after high volume",
+                        }
+                    )
+
+    # Correlation 2: Temperature
+    if len(temps) >= 10:
+        insights.append(
+            {
+                "type": "weather",
+                "title": "Temperature Sweet Spot",
+                "description": (
+                    f"You've run in temps from {min(temps):.0f}°C to {max(temps):.0f}°C."
+                    " Most runners perform best at 8-15°C."
+                ),
+                "recommendation": "Adjust pace expectations in extreme temps",
+            }
+        )
+
+    # Correlation 3: Sleep vs HRV
+    if len(sleep_scores) >= 10 and len(hrvs) >= 10:
+        good_sleep = [hrvs[i] for i, s in enumerate(sleep_scores) if s > 75 and i < len(hrvs)]
+        poor_sleep = [hrvs[i] for i, s in enumerate(sleep_scores) if s < 60 and i < len(hrvs)]
+
+        if good_sleep and poor_sleep:
+            avg_good = sum(good_sleep) / len(good_sleep)
+            avg_poor = sum(poor_sleep) / len(poor_sleep)
+            diff = ((avg_good - avg_poor) / avg_poor) * 100 if avg_poor > 0 else 0
+
+            if diff > 15:
+                insights.append(
+                    {
+                        "type": "sleep_recovery",
+                        "title": "Sleep Matters",
+                        "description": (
+                            f"Good sleep (>75 score) correlates with {diff:.0f}% higher HRV."
+                            " Sleep is your superpower!"
+                        ),
+                        "recommendation": "Prioritize 7+ hours of quality sleep",
+                    }
+                )
+
+    # Correlation 4: Rest day pattern
+    rest_data = [(r[0], r[1]) for r in rest_rows if r[0] is not None and r[1] is not None]
+
+    if len(rest_data) >= 10:
+        after_rest = [hrv for rest, hrv in rest_data if rest == 0]
+        after_break = [hrv for rest, hrv in rest_data if rest >= 2]
+
+        if after_rest and after_break and len(after_rest) > 2 and len(after_break) > 2:
+            avg_after_rest = sum(after_rest) / len(after_rest)
+            avg_after_break = sum(after_break) / len(after_break)
+
+            if avg_after_break > avg_after_rest * 1.1:
+                insights.append(
+                    {
+                        "type": "rest_recovery",
+                        "title": "Rest Days Work",
+                        "description": (
+                            f"HRV is {((avg_after_break / avg_after_rest - 1) * 100):.0f}%"
+                            " higher after 2+ rest days. Trust the process!"
+                        ),
+                        "recommendation": "Don't skip planned rest days",
+                    }
+                )
+
+    return {
+        "insights": insights,
+        "data_points": len(main_rows),
+        "message": (
+            f"Analyzed {len(main_rows)} snapshots"
+            if insights
+            else "Keep logging data - correlations will appear with more entries"
+        ),
     }

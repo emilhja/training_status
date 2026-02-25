@@ -527,8 +527,8 @@ class GearCreate(BaseModel):
 
 
 class GearUpdate(BaseModel):
-    name: str | None = None
-    brand: str | None = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    brand: str | None = Field(None, max_length=100)
     retirement_km: float | None = None
     accumulated_km: float | None = None
 
@@ -557,13 +557,13 @@ class HealthEventCreate(BaseModel):
     end_date: str | None = None
     event_type: str = Field(..., pattern=r"^(illness|injury|rest_period)$")
     description: str = Field(..., min_length=1, max_length=500)
-    tags: str | None = None
+    tags: str | None = Field(None, max_length=200)
 
 
 class HealthEventUpdate(BaseModel):
     end_date: str | None = None
-    description: str | None = None
-    tags: str | None = None
+    description: str | None = Field(None, min_length=1, max_length=500)
+    tags: str | None = Field(None, max_length=200)
 
 
 class HealthEventList(BaseModel):

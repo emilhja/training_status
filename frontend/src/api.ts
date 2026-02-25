@@ -281,6 +281,17 @@ export async function createShareLink(expiresDays?: number): Promise<{ token: st
   return res.json()
 }
 
+export async function fetchShareLinks(): Promise<{ items: Array<{ token: string; created_at: string; expires_at: string | null; is_active: boolean }> }> {
+  return cachedGet('/api/share')
+}
+
+export async function revokeShareLink(token: string): Promise<{ success: boolean }> {
+  const res = await fetch(`/api/share/${token}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await deleteCached('/api/share')
+  return res.json()
+}
+
 export async function fetchSharedView(token: string): Promise<Record<string, unknown>> {
   return cachedGet(`/api/shared/${token}`)
 }

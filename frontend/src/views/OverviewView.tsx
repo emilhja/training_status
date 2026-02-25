@@ -1,23 +1,30 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import type { Snapshot } from '../types'
+import ErrorBoundary from '../components/ErrorBoundary'
 import MetricCard from '../components/current/MetricCard'
-import TrainingLoadChart from '../components/charts/TrainingLoadChart'
-import GoalProgress from '../components/features/GoalProgress'
-import ConsistencyScore from '../components/features/ConsistencyScore'
-import RecoveryRecommendation from '../components/features/RecoveryRecommendation'
-import CalendarHeatmap from '../components/features/CalendarHeatmap'
 import SmartAlerts from '../components/features/SmartAlerts'
-import CompareMode from '../components/features/CompareMode'
-import InjuryRiskPanel from '../components/features/InjuryRiskPanel'
-import CorrelationInsights from '../components/features/CorrelationInsights'
-import WeeklySummary from '../components/features/WeeklySummary'
-import GoalAdherence from '../components/features/GoalAdherence'
-import WeeklyActivitiesWidget from '../components/features/WeeklyActivitiesWidget'
-import HrvOverviewWidget from '../components/features/HrvOverviewWidget'
-import ReadinessScore from '../components/features/ReadinessScore'
-import WorkoutSuggestion from '../components/features/WorkoutSuggestion'
 import { loadDashboardConfig } from '../components/features/DashboardConfig'
 import { ctlStatus, tsbStatus, tsbZone, fmt } from '../utils/metrics'
+
+// Heavy components loaded lazily to improve initial bundle / PWA startup time
+const TrainingLoadChart = lazy(() => import('../components/charts/TrainingLoadChart'))
+const GoalProgress = lazy(() => import('../components/features/GoalProgress'))
+const ConsistencyScore = lazy(() => import('../components/features/ConsistencyScore'))
+const RecoveryRecommendation = lazy(() => import('../components/features/RecoveryRecommendation'))
+const CalendarHeatmap = lazy(() => import('../components/features/CalendarHeatmap'))
+const CompareMode = lazy(() => import('../components/features/CompareMode'))
+const InjuryRiskPanel = lazy(() => import('../components/features/InjuryRiskPanel'))
+const CorrelationInsights = lazy(() => import('../components/features/CorrelationInsights'))
+const WeeklySummary = lazy(() => import('../components/features/WeeklySummary'))
+const GoalAdherence = lazy(() => import('../components/features/GoalAdherence'))
+const WeeklyActivitiesWidget = lazy(() => import('../components/features/WeeklyActivitiesWidget'))
+const HrvOverviewWidget = lazy(() => import('../components/features/HrvOverviewWidget'))
+const ReadinessScore = lazy(() => import('../components/features/ReadinessScore'))
+const WorkoutSuggestion = lazy(() => import('../components/features/WorkoutSuggestion'))
+
+function WidgetSkeleton() {
+  return <div className="bg-gray-900 rounded-xl p-4 h-24 animate-pulse" />
+}
 
 interface Props {
   s: Snapshot
@@ -65,7 +72,13 @@ export default function OverviewView({ s, snapshots }: Props) {
     <div className="space-y-6">
       {dashConfig.filter(w => w.visible).map(w => {
         const widget = widgetMap[w.id]
-        return widget ? <div key={w.id}>{widget}</div> : null
+        return widget ? (
+          <ErrorBoundary key={w.id}>
+            <Suspense fallback={<WidgetSkeleton />}>
+              {widget}
+            </Suspense>
+          </ErrorBoundary>
+        ) : null
       })}
     </div>
   )

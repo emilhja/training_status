@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+import time
 from contextlib import asynccontextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,7 @@ from .models import (
 )
 from .services.analytics import (
     calculate_consistency_score,
+    calculate_correlations,
     calculate_detraining,
     calculate_goal_adherence,
     calculate_hr_drift,
@@ -71,6 +73,10 @@ from .services.analytics import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting for /api/fetch — reject if last successful trigger was < 5 minutes ago
+_FETCH_COOLDOWN_SECS = 300
+_last_fetch_time: float = 0.0
 
 # Determine paths - project root is 3 levels up from api.py (src/training_status/)
 BASE_DIR = Path(__file__).parent.parent.parent.parent
@@ -195,6 +201,16 @@ def get_snapshots(
 @app.post("/api/fetch", response_model=FetchResponse)
 def trigger_fetch() -> dict[str, Any]:
     """Trigger a data fetch from external APIs."""
+    global _last_fetch_time
+    now = time.monotonic()
+    elapsed = now - _last_fetch_time
+    if elapsed < _FETCH_COOLDOWN_SECS:
+        wait = int(_FETCH_COOLDOWN_SECS - elapsed)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests — wait {wait}s before fetching again",
+        )
+
     from .cli import generate_report
 
     stdout_buf = io.StringIO()
@@ -202,6 +218,7 @@ def trigger_fetch() -> dict[str, Any]:
     try:
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
             generate_report()
+        _last_fetch_time = time.monotonic()
         return {
             "success": True,
             "output": stdout_buf.getvalue(),
@@ -211,7 +228,7 @@ def trigger_fetch() -> dict[str, Any]:
         return {
             "success": False,
             "output": stdout_buf.getvalue(),
-            "error": f"{e}\n{stderr_buf.getvalue()}".strip(),
+            "error": str(e),
         }
 
 
@@ -336,7 +353,7 @@ def get_injury_risk() -> dict[str, Any]:
 def get_correlations() -> dict[str, Any]:
     """Find correlations in training data."""
     db = get_db()
-    rows = db.get_snapshots_for_analytics(
+    main_rows = db.get_snapshots_for_analytics(
         columns=[
             "week_0_km",
             "hrv",
@@ -349,118 +366,8 @@ def get_correlations() -> dict[str, Any]:
         ],
         limit=30,
     )
-
-    insights = []
-
-    if len(rows) < 10:
-        return {
-            "insights": [],
-            "data_points": len(rows),
-            "message": "Need more data for correlation analysis",
-        }
-
-    # Extract columns
-    volumes = [r[0] for r in rows if r[0] is not None]
-    hrvs = [r[1] for r in rows if r[1] is not None]
-    sleep_scores = [r[2] for r in rows if r[2] is not None]
-    temps = [r[3] for r in rows if r[3] is not None]
-
-    # Correlation 1: Volume vs HRV
-    if len(volumes) >= 10 and len(hrvs) >= 10:
-        high_vol_days = [i for i, v in enumerate(volumes) if v > 35]
-        low_vol_days = [i for i, v in enumerate(volumes) if v < 20]
-
-        if high_vol_days and low_vol_days:
-            high_vol_hrv = [hrvs[i] for i in high_vol_days if i < len(hrvs)]
-            low_vol_hrv = [hrvs[i] for i in low_vol_days if i < len(hrvs)]
-
-            if high_vol_hrv and low_vol_hrv:
-                avg_high = sum(high_vol_hrv) / len(high_vol_hrv)
-                avg_low = sum(low_vol_hrv) / len(low_vol_hrv)
-                diff_pct = ((avg_low - avg_high) / avg_high) * 100 if avg_high > 0 else 0
-
-                if diff_pct > 10:
-                    insights.append(
-                        {
-                            "type": "volume_recovery",
-                            "title": "High Volume Impact",
-                            "description": (
-                                f"Your HRV is {diff_pct:.0f}% lower after"
-                                " high volume weeks (>35km). Consider more recovery."
-                            ),
-                            "recommendation": "Schedule easier days after high volume",
-                        }
-                    )
-
-    # Correlation 2: Temperature
-    if len(temps) >= 10:
-        insights.append(
-            {
-                "type": "weather",
-                "title": "Temperature Sweet Spot",
-                "description": (
-                    f"You've run in temps from {min(temps):.0f}°C to {max(temps):.0f}°C."
-                    " Most runners perform best at 8-15°C."
-                ),
-                "recommendation": "Adjust pace expectations in extreme temps",
-            }
-        )
-
-    # Correlation 3: Sleep vs recovery
-    if len(sleep_scores) >= 10 and len(hrvs) >= 10:
-        good_sleep = [hrvs[i] for i, s in enumerate(sleep_scores) if s > 75 and i < len(hrvs)]
-        poor_sleep = [hrvs[i] for i, s in enumerate(sleep_scores) if s < 60 and i < len(hrvs)]
-
-        if good_sleep and poor_sleep:
-            avg_good = sum(good_sleep) / len(good_sleep)
-            avg_poor = sum(poor_sleep) / len(poor_sleep)
-            diff = ((avg_good - avg_poor) / avg_poor) * 100 if avg_poor > 0 else 0
-
-            if diff > 15:
-                insights.append(
-                    {
-                        "type": "sleep_recovery",
-                        "title": "Sleep Matters",
-                        "description": (
-                            f"Good sleep (>75 score) correlates with {diff:.0f}% higher HRV."
-                            " Sleep is your superpower!"
-                        ),
-                        "recommendation": "Prioritize 7+ hours of quality sleep",
-                    }
-                )
-
-    # Correlation 4: Rest day pattern
     rest_rows = db.get_snapshots_for_analytics(columns=["rest_days", "hrv"], limit=20)
-    rest_data = [(r[0], r[1]) for r in rest_rows if r[0] is not None and r[1] is not None]
-
-    if len(rest_data) >= 10:
-        after_rest = [hrv for rest, hrv in rest_data if rest == 0]
-        after_break = [hrv for rest, hrv in rest_data if rest >= 2]
-
-        if after_rest and after_break and len(after_rest) > 2 and len(after_break) > 2:
-            avg_after_rest = sum(after_rest) / len(after_rest)
-            avg_after_break = sum(after_break) / len(after_break)
-
-            if avg_after_break > avg_after_rest * 1.1:
-                insights.append(
-                    {
-                        "type": "rest_recovery",
-                        "title": "Rest Days Work",
-                        "description": (
-                            f"HRV is {((avg_after_break / avg_after_rest - 1) * 100):.0f}%"
-                            " higher after 2+ rest days. Trust the process!"
-                        ),
-                        "recommendation": "Don't skip planned rest days",
-                    }
-                )
-
-    return {
-        "insights": insights,
-        "data_points": len(rows),
-        "message": f"Analyzed {len(rows)} snapshots"
-        if insights
-        else "Keep logging data - correlations will appear with more entries",
-    }
+    return calculate_correlations(main_rows, rest_rows)
 
 
 @app.get("/api/analytics/race-predictor", response_model=RacePredictorResponse)
@@ -707,7 +614,22 @@ def get_workout_suggestion() -> dict[str, Any]:
                     rest_days += snapshot_age_days
             except (ValueError, TypeError):
                 pass
-    result = suggest_workout(tsb, sleep_score, rest_days, dt.now().weekday(), week_change_pct)
+    # If trained today, fetch activity types for context-aware advice
+    today_activities: list[str] | None = None
+    if rest_days is not None and rest_days == 0:
+        try:
+            from datetime import date as date_cls
+            from .services import IntervalsClient
+            settings = get_settings()
+            client = IntervalsClient(settings)
+            today_str = date_cls.today().isoformat()
+            acts = client._get("activities", params={"oldest": today_str, "newest": today_str})
+            if isinstance(acts, list):
+                today_activities = [a.get("type", "Unknown") for a in acts if a.get("type")]
+        except Exception:
+            pass  # Fall back to generic message
+
+    result = suggest_workout(tsb, sleep_score, rest_days, dt.now().weekday(), week_change_pct, today_activities)
     result["data_age_hours"] = data_age_hours
     return result
 
@@ -928,6 +850,25 @@ def create_share_link(body: SharedLinkCreate) -> dict[str, Any]:
         expires_at = (datetime.now() + timedelta(days=body.expires_days)).isoformat()
     db.create_shared_link(token, expires_at)
     return {"token": token, "url": f"/shared/{token}", "expires_at": expires_at}
+
+
+@app.get("/api/share")
+def list_share_links() -> dict[str, Any]:
+    """List all active share links."""
+    db = get_db()
+    links = db.get_all_shared_links()
+    return {"items": [dict(link) for link in links]}
+
+
+@app.delete("/api/share/{token}", response_model=SuccessResponse)
+def revoke_share_link(token: str) -> dict[str, Any]:
+    """Revoke (deactivate) a share link by token."""
+    db = get_db()
+    link = db.get_shared_link(token)
+    if not link:
+        raise HTTPException(status_code=404, detail="Share link not found")
+    db.deactivate_shared_link(token)
+    return {"success": True}
 
 
 @app.get("/api/shared/{token}")

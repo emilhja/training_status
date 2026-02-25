@@ -1,9 +1,12 @@
 """Intervals.icu API client."""
 
+import logging
 from datetime import date, datetime, timedelta
 from typing import Any, cast
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 from ..config import Settings
 
@@ -188,7 +191,13 @@ class IntervalsClient:
 
                 if cs_fit > 0:
                     raw["pace_curves"] = {"n_activities": len(curves), "points_used": pts}
-                    return {"critical_speed": round(cs_fit, 4), "d_prime": round(dp_fit, 2)}
+                    cs_rounded = round(cs_fit, 4)
+                    dp_rounded = round(dp_fit, 2)
+                    logger.info(
+                        "Critical Speed updated: CS=%.2f m/s, D'=%.1fm (from %d activities, %d points)",
+                        cs_rounded, dp_rounded, len(curves), len(pts),
+                    )
+                    return {"critical_speed": cs_rounded, "d_prime": dp_rounded}
 
         return {"critical_speed": None, "d_prime": None}
 

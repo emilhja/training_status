@@ -4,6 +4,27 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react-router-dom',
+      'react-is',
+      'recharts',
+      '@reduxjs/toolkit',
+      'clsx',
+      'decimal.js-light',
+      'es-toolkit',
+      'eventemitter3',
+      'immer',
+      'react-redux',
+      'reselect',
+      'tiny-invariant',
+      'use-sync-external-store',
+    ],
+    noDiscovery: true,
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:8000',

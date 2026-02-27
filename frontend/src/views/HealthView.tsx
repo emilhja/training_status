@@ -14,23 +14,24 @@ interface Props {
 export default function HealthView({ s, snapshots }: Props) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-4">
         <MetricCard label="Resting HR" value={s.resting_hr ?? '—'} unit="bpm" glossaryKey="resting_hr" />
         <MetricCard label="HRV (RMSSD)" value={fmt(s.hrv, 0)} unit="ms" glossaryKey="hrv" />
         {s.hrv_sdnn !== null && <MetricCard label="HRV (SDNN)" value={fmt(s.hrv_sdnn, 0)} unit="ms" glossaryKey="hrv" />}
+        {s.readiness !== null && <MetricCard label="Readiness" value={s.readiness} unit="/100" glossaryKey="readiness" />}
         <MetricCard label="Sleep" value={fmtSleep(s.sleep_secs)} status={sleepStatus(s.sleep_quality)}
                     sub={s.sleep_score ? `${Math.round(s.sleep_score)}/100` : undefined} glossaryKey="sleep" />
         <MetricCard label="VO2max" value={s.vo2max ?? '—'} glossaryKey="vo2max" />
         <MetricCard label="Steps" value={s.steps?.toLocaleString() ?? '—'} />
+        {s.week_0_km !== null && <MetricCard label="This Week" value={fmt(s.week_0_km)} unit="km" />}
         {s.spo2 !== null && <MetricCard label="SpO2" value={s.spo2} unit="%" glossaryKey="spo2" />}
       </div>
 
-      {(s.stress !== null || s.readiness !== null || s.weight !== null || s.body_fat !== null) && (
+      {(s.stress !== null || s.weight !== null || s.body_fat !== null) && (
         <div className="bg-gray-900 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Wellness (Garmin/Intervals)</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {s.stress !== null && <MetricCard label="Stress" value={s.stress} unit="/100" glossaryKey="stress" />}
-            {s.readiness !== null && <MetricCard label="Readiness" value={s.readiness} unit="/100" glossaryKey="readiness" />}
             {s.weight !== null && <MetricCard label="Weight" value={fmt(s.weight)} unit="kg" glossaryKey="weight" />}
             {s.body_fat !== null && <MetricCard label="Body Fat" value={fmt(s.body_fat)} unit="%" glossaryKey="body_fat" />}
           </div>

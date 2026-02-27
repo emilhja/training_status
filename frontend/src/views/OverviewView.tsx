@@ -34,14 +34,22 @@ interface Props {
 export default function OverviewView({ s, snapshots }: Props) {
   const dashConfig = loadDashboardConfig()
   const widgetMap: Record<string, ReactNode> = {
-    readiness: <ReadinessScore />,
+    weekly_summary_readiness: (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <WeeklySummary />
+        <ReadinessScore />
+      </div>
+    ),
     workout_suggestion: <WorkoutSuggestion />,
-    weekly_summary: <WeeklySummary />,
     smart_alerts: <SmartAlerts snapshot={s} />,
     injury_risk: <InjuryRiskPanel />,
     recovery_recommendation: <RecoveryRecommendation />,
-    goal_progress: <GoalProgress snapshot={s} />,
-    goal_adherence: <GoalAdherence />,
+    goal_progress_adherence: (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+        <GoalProgress snapshot={s} />
+        <GoalAdherence />
+      </div>
+    ),
     metric_cards: (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <MetricCard label="Fitness (CTL)" value={fmt(s.ctl)} status={ctlStatus(s.ramp_rate)} glossaryKey="ctl" />

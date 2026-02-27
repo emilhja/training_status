@@ -112,7 +112,7 @@ export default function GoalProgress({ snapshot }: Props) {
   if (goals.length === 0) return null
 
   return (
-    <div className="space-y-4">
+    <>
       {goals.map(goal => {
         const progress = getGoalProgress(snapshot, goal)
         if (!progress) return null
@@ -146,6 +146,6 @@ export default function GoalProgress({ snapshot }: Props) {
           </div>
         )
       })}
-    </div>
+    </>
   )
 }

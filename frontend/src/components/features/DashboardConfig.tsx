@@ -5,14 +5,12 @@ const STORAGE_KEY = 'training_status_dashboard_config'
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'weekly_activities', visible: true },
-  { id: 'readiness', visible: true },
+  { id: 'weekly_summary_readiness', visible: true },
   { id: 'workout_suggestion', visible: true },
-  { id: 'weekly_summary', visible: true },
   { id: 'smart_alerts', visible: true },
   { id: 'injury_risk', visible: true },
   { id: 'recovery_recommendation', visible: true },
-  { id: 'goal_progress', visible: true },
-  { id: 'goal_adherence', visible: true },
+  { id: 'goal_progress_adherence', visible: true },
   { id: 'metric_cards', visible: true },
   { id: 'compare_consistency', visible: true },
   { id: 'correlation_insights', visible: true },
@@ -22,14 +20,12 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
 ]
 
 const WIDGET_LABELS: Record<string, string> = {
-  readiness: 'Training Readiness',
+  weekly_summary_readiness: 'This Week & Training Readiness',
   workout_suggestion: 'Workout Suggestion',
-  weekly_summary: 'Weekly Summary',
   smart_alerts: 'Smart Alerts',
   injury_risk: 'Injury Risk',
   recovery_recommendation: 'Recovery Recommendation',
-  goal_progress: 'Goal Progress',
-  goal_adherence: 'Goal Adherence',
+  goal_progress_adherence: 'Goals & Adherence',
   metric_cards: 'Key Metrics',
   compare_consistency: 'Compare & Consistency',
   correlation_insights: 'Correlation Insights',

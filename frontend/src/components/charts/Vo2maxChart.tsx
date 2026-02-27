@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Snapshot } from '../../types'
+import { dedupeByDay } from '../../utils/metrics'
 
 interface Props {
   snapshots: Snapshot[]
@@ -7,7 +8,7 @@ interface Props {
 
 export default function Vo2maxChart({ snapshots }: Props) {
   // Filter snapshots with VO2max data
-  const data = snapshots
+  const data = dedupeByDay(snapshots)
     .filter(s => s.vo2max !== null)
     .map(s => ({
       date: s.recorded_at.slice(5, 10),

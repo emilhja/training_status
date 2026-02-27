@@ -1,4 +1,5 @@
 import type { Snapshot } from '../../types'
+import { dedupeByDay } from '../../utils/metrics'
 
 interface Props {
   snapshots: Snapshot[]
@@ -9,7 +10,7 @@ interface Props {
 
 export default function SparklineChart({ snapshots, dataKey, color = '#22c55e', height = 40 }: Props) {
   // Get last 7 snapshots
-  const data = snapshots.slice(-7).map(s => s[dataKey] as number | null).filter(v => v !== null) as number[]
+  const data = dedupeByDay(snapshots).slice(-7).map(s => s[dataKey] as number | null).filter(v => v !== null) as number[]
   
   if (data.length < 2) return <div className="text-xs text-gray-500">Not enough data</div>
 

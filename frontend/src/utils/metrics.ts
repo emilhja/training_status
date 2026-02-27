@@ -1,4 +1,15 @@
-import type { Status } from '../types'
+import type { Status, Snapshot } from '../types'
+
+// --- Data helpers ---
+
+/** Keep only the last snapshot per calendar day (based on recorded_at). */
+export function dedupeByDay(snapshots: Snapshot[]): Snapshot[] {
+  const seen = new Map<string, Snapshot>()
+  for (const s of snapshots) {
+    seen.set(s.recorded_at.slice(0, 10), s) // last entry wins
+  }
+  return Array.from(seen.values())
+}
 
 // --- Status helpers (mirror backend cli.py logic) ---
 

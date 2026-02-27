@@ -10,14 +10,14 @@ import {
   ReferenceLine,
 } from 'recharts'
 import type { Snapshot } from '../../types'
+import { dedupeByDay } from '../../utils/metrics'
 
 interface Props {
   snapshots: Snapshot[]
 }
 
 export default function TsbZonesChart({ snapshots }: Props) {
-  const data = [...snapshots]
-    .reverse()
+  const data = dedupeByDay([...snapshots].reverse())
     .map((s) => ({
       date: s.recorded_at.slice(0, 10),
       TSB: s.tsb,

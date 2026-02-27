@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import type { Snapshot, AnnotationItem } from '../../types'
 import { fetchAnnotations } from '../../api'
+import { dedupeByDay } from '../../utils/metrics'
 
 interface Props { snapshots: Snapshot[] }
 
@@ -12,7 +13,7 @@ export default function HrvChart({ snapshots }: Props) {
     fetchAnnotations('hrv').then(d => setAnnotations(d.items)).catch(() => {})
   }, [])
 
-  const data = snapshots.map(s => ({
+  const data = dedupeByDay(snapshots).map(s => ({
     date:         s.recorded_at.slice(0, 10),
     HRV:          s.hrv,
     'Resting HR': s.resting_hr,

@@ -77,6 +77,7 @@ SNAPSHOT_DATA = {
     "strava_total_km": None,
     "strava_run_count": None,
     "strava_ytd_km": None,
+    "respiratory_rate": None,
     "intervals_json": "{}",
     "smashrun_json": "{}",
 }

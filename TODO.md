@@ -110,5 +110,42 @@ See API_FIELDS.md and git history for implemented features.
 - Customizable Dashboard (widget reorder/toggle via localStorage)
 - Onboarding / Empty States (reusable EmptyState component)
 
+### A. Keyboard Shortcuts ✅
+- [x] `r` — trigger data refresh from anywhere in the app
+- [x] `1`–`9` — jump to views (Overview, Training, Health, Analysis, Running, Activities, Trends, Log, Gear)
+- [x] Show shortcut reference panel (press `?`)
+
+### B. Snapshot Diff View ✅
+- [x] Select any two dates and compare metrics side-by-side
+- [x] Color-coded delta column (green = improvement, red = regression)
+- [ ] Chart overlay: plot both snapshots' CTL/ATL/TSB curves on same axes
+
+### C. Expanded Annotation Metrics ✅
+- [x] Annotations now support: `ctl`, `atl`, `hrv`, `tsb`, `resting_hr`, `sleep_score`, `vo2max`, `weight`, `week_0_km`, `general`
+- [ ] Allow annotation on any arbitrary metric name (open text field)
+
+### D. Data Integrity Check Endpoint ✅
+- [x] `GET /api/health` — public endpoint, returns DB status, table list, and latest snapshot age
+- [ ] Frontend status page / widget showing last-fetch age and DB health
+
+### E. Database Backup Endpoint ✅
+- [x] `GET /api/export/db` — auth-gated, downloads the raw SQLite file for full backup/restore
+- [ ] Frontend "Download DB" button in Settings → Export section
+
+### F. Garmin Connect Integration (excluded — requires SSO)
+- [ ] Test `python-garminconnect` unofficial repo
+- [ ] Requires secure credential storage (not plain `.env`) due to Garmin SSO
+- See TODO item #13
+
+### G. Goal Progress Push Notifications ✅
+- [x] After each Refresh, check if any weekly_km goal is met — show celebratory toast
+- [ ] Send a browser push notification via Service Worker when goal is crossed (requires SW message passing)
+
+### H. Per-Snapshot Notes ✅
+- [x] `training_notes` table now has `snapshot_id INTEGER` column (migration applied automatically)
+- [x] `POST /api/notes` accepts optional `snapshot_id` to link a note to a specific snapshot
+- [x] `createNote()` in frontend API accepts optional `snapshot_id`
+- [ ] UI: note entry form in LogView shows "Link to today's snapshot" checkbox
+
 ## Contributing
 Feel free to pick up any of these features! Create a branch and submit a PR.

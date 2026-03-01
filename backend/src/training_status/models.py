@@ -339,6 +339,7 @@ class Note(BaseModel):
     created_at: str
     note_date: str
     content: str
+    snapshot_id: int | None = None
 
 
 class NoteCreate(BaseModel):
@@ -346,6 +347,7 @@ class NoteCreate(BaseModel):
 
     note_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     content: str = Field(..., min_length=1, max_length=2000)
+    snapshot_id: int | None = None
 
 
 class NoteList(BaseModel):
@@ -588,7 +590,10 @@ class Annotation(BaseModel):
 
 class AnnotationCreate(BaseModel):
     annotation_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
-    metric: str = Field("general", pattern=r"^(ctl|hrv|tsb|general)$")
+    metric: str = Field(
+        "general",
+        pattern=r"^(ctl|atl|hrv|tsb|resting_hr|sleep_score|vo2max|weight|week_0_km|general)$",
+    )
     content: str = Field(..., min_length=1, max_length=500)
 
 

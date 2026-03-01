@@ -1,6 +1,7 @@
 """Database connection and query management."""
 
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -16,7 +17,9 @@ from .schema import (
     CREATE_TRAINING_NOTES_TABLE,
     INSERT_SNAPSHOT,
     MIGRATIONS,
+    NOTE_MIGRATIONS,
     SNAPSHOT_COLUMNS,
+    SNAPSHOT_COLUMNS_SET,
 )
 
 
@@ -38,12 +41,18 @@ class Database:
         try:
             yield conn
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
     def init_schema(self) -> None:
         """Initialize database schema with migrations."""
         with self.connection() as conn:
+            # Enable WAL mode for better concurrent read performance
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             # Create tables
             conn.execute(CREATE_GOALS_TABLE)
             conn.execute(CREATE_SNAPSHOTS_TABLE)
@@ -54,10 +63,17 @@ class Database:
             conn.execute(CREATE_ANNOTATIONS_TABLE)
             conn.execute(CREATE_SHARED_LINKS_TABLE)
 
-            # Apply migrations
+            # Apply snapshot column migrations
             for col, typ in MIGRATIONS:
                 try:
                     conn.execute(f"ALTER TABLE snapshots ADD COLUMN {col} {typ}")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+
+            # Apply non-snapshot table migrations
+            for stmt in NOTE_MIGRATIONS:
+                try:
+                    conn.execute(stmt)
                 except sqlite3.OperationalError:
                     pass  # Column already exists
 
@@ -91,8 +107,7 @@ class Database:
 
         Only columns present in SNAPSHOT_COLUMNS are allowed; unknown names raise ValueError.
         """
-        _valid = set(SNAPSHOT_COLUMNS)
-        invalid = [c for c in columns if c not in _valid]
+        invalid = [c for c in columns if c not in SNAPSHOT_COLUMNS_SET]
         if invalid:
             raise ValueError(f"Unknown column(s) requested: {invalid}")
         cols = ", ".join(columns)
@@ -229,14 +244,15 @@ class Database:
                 (limit,),
             ).fetchall()
 
-    def create_note(self, note_date: str, content: str) -> None:
-        """Create a new training note."""
+    def create_note(self, note_date: str, content: str, snapshot_id: int | None = None) -> None:
+        """Create a new training note, optionally linked to a specific snapshot."""
         from datetime import datetime
 
         with self.connection() as conn:
             conn.execute(
-                "INSERT INTO training_notes (created_at, note_date, content) VALUES (?, ?, ?)",
-                (datetime.now().isoformat(), note_date, content),
+                "INSERT INTO training_notes (created_at, note_date, content, snapshot_id)"
+                " VALUES (?, ?, ?, ?)",
+                (datetime.now().isoformat(), note_date, content, snapshot_id),
             )
 
     def delete_note(self, note_id: int) -> None:
@@ -270,14 +286,14 @@ class Database:
 
     def update_gear(self, gear_id: int, **kwargs: object) -> None:
         allowed = {"name", "brand", "retirement_km", "accumulated_km", "is_active"}
-        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        fields = [(k, v) for k, v in kwargs.items() if k in allowed]
         if not fields:
             return
-        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        set_clause = ", ".join(f"{k} = ?" for k, _ in fields)
         with self.connection() as conn:
             conn.execute(
                 f"UPDATE gear SET {set_clause} WHERE id = ?",
-                (*fields.values(), gear_id),
+                [v for _, v in fields] + [gear_id],
             )
 
     def delete_gear(self, gear_id: int) -> None:
@@ -311,14 +327,14 @@ class Database:
 
     def update_health_event(self, event_id: int, **kwargs: object) -> None:
         allowed = {"end_date", "description", "tags"}
-        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        fields = [(k, v) for k, v in kwargs.items() if k in allowed]
         if not fields:
             return
-        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        set_clause = ", ".join(f"{k} = ?" for k, _ in fields)
         with self.connection() as conn:
             conn.execute(
                 f"UPDATE health_events SET {set_clause} WHERE id = ?",
-                (*fields.values(), event_id),
+                [v for _, v in fields] + [event_id],
             )
 
     def delete_health_event(self, event_id: int) -> None:
@@ -387,18 +403,21 @@ class Database:
 # This works correctly with a single uvicorn worker (the default for this project).
 # If you ever switch to multi-worker mode (--workers N > 1), each worker gets its
 # own copy of this variable, which is safe with SQLite (one writer at a time) but
-# means schema init runs once per worker. Do not share this instance across threads.
+# means schema init runs once per worker.
 _db_instance: Database | None = None
+_db_lock = threading.Lock()
 
 
 def get_db(db_path: Path | None = None) -> Database:
-    """Get or create the process-scoped database singleton."""
+    """Get or create the process-scoped database singleton (thread-safe)."""
     global _db_instance
     if _db_instance is None:
-        if db_path is None:
-            from ..config import get_settings
+        with _db_lock:
+            if _db_instance is None:
+                if db_path is None:
+                    from ..config import get_settings
 
-            db_path = get_settings().db_path
-        _db_instance = Database(db_path)
-        _db_instance.init_schema()
+                    db_path = get_settings().db_path
+                _db_instance = Database(db_path)
+                _db_instance.init_schema()
     return _db_instance

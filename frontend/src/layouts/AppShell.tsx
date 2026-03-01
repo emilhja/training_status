@@ -2,7 +2,8 @@
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { triggerFetch } from '../api'
+import { triggerFetch, fetchGoals } from '../api'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useLatestSnapshot } from '../hooks/useLatestSnapshot'
 import { useSnapshots } from '../hooks/useSnapshots'
 import WeeklyKmChart from '../components/charts/WeeklyKmChart'
@@ -29,10 +30,11 @@ const RunningView         = lazy(() => import('../views/RunningView'))
 const TrendsView          = lazy(() => import('../views/TrendsView'))
 const LogView             = lazy(() => import('../views/LogView'))
 const GearView            = lazy(() => import('../views/GearView'))
+const DiffView            = lazy(() => import('../views/DiffView'))
 
-type MainView = 'overview' | 'training' | 'health' | 'analysis' | 'running' | 'activities' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
+type MainView = 'overview' | 'training' | 'health' | 'analysis' | 'running' | 'activities' | 'trends' | 'log' | 'gear' | 'diff' | 'compact' | 'accordion' | 'settings'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'analysis', 'running', 'activities', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
+const validViews: MainView[] = ['overview', 'training', 'health', 'analysis', 'running', 'activities', 'trends', 'log', 'gear', 'diff', 'compact', 'accordion', 'settings']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'overview',   label: 'Overview',        icon: '⊞' },
   { id: 'training',   label: 'Training',         icon: '▲' },
@@ -43,6 +45,7 @@ const menuItems: { id: MainView; label: string; icon: string }[] = [
   { id: 'trends',     label: 'Trends',           icon: '📈' },
   { id: 'log',        label: 'Log',              icon: '📝' },
   { id: 'gear',       label: 'Gear',             icon: '🏷' },
+  { id: 'diff',       label: 'Snapshot Diff',    icon: '⇄' },
   { id: 'compact',    label: 'Compact View',     icon: '⬚' },
   { id: 'accordion',  label: 'Accordion View',   icon: '☰' },
   { id: 'settings',   label: 'Settings',         icon: '⚙' },
@@ -63,6 +66,7 @@ export default function AppShell() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   const { data: s, loading, error, refetch } = useLatestSnapshot()
   const { data: historyData, refetch: refetchHistory } = useSnapshots(90)
@@ -72,7 +76,17 @@ export default function AppShell() {
     setRefreshing(true)
     try {
       await triggerFetch()
-      await Promise.all([refetch(), refetchHistory()])
+      const [, , goalsData] = await Promise.all([refetch(), refetchHistory(), fetchGoals()])
+      // Feature G: notify if a weekly_km goal is reached after refresh
+      const latestSnap = await import('../api').then(m => m.fetchLatest())
+      if (latestSnap.week_0_km !== null && latestSnap.week_0_km !== undefined) {
+        for (const goal of goalsData.items) {
+          if (goal.goal_type === 'weekly_km' && goal.is_active && latestSnap.week_0_km >= goal.target_value) {
+            showToast(`Goal reached! ${latestSnap.week_0_km.toFixed(1)} / ${goal.target_value} km this week`, 'success')
+            break
+          }
+        }
+      }
       showToast('Data refreshed', 'success')
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Refresh failed', 'error')
@@ -80,6 +94,9 @@ export default function AppShell() {
       setRefreshing(false)
     }
   }
+
+  // Feature A: keyboard shortcuts — r=refresh, 1-9=navigate views, ?=help panel
+  useKeyboardShortcuts(handleRefresh, navigate, () => setShowShortcuts(v => !v))
 
   const snapshots = historyData ? [...historyData.items].reverse() : []
 
@@ -118,6 +135,7 @@ export default function AppShell() {
       case 'trends':     return <TrendsView snapshots={snapshots} />
       case 'log':        return <LogView />
       case 'gear':       return <GearView />
+      case 'diff':       return <DiffView snapshots={snapshots} />
       case 'activities': return <ActivitiesTab />
       case 'compact':    return <CompactView />
       case 'accordion':  return <AccordionView />
@@ -234,7 +252,7 @@ export default function AppShell() {
 
           {/* Quick Stats in Left Sidebar (when expanded) */}
           {!leftCollapsed && (
-            <div className="p-3 border-t border-gray-800 space-y-4">
+            <div className="p-3 border-t border-gray-800 space-y-4 overflow-y-auto">
               {/* Trend Indicators */}
               <div>
                 <p className="text-xs uppercase text-gray-500 tracking-wider mb-2">Trends (vs last)</p>
@@ -325,6 +343,18 @@ export default function AppShell() {
               )}
             </div>
           )}
+
+          {/* Shortcut hint at bottom of left sidebar */}
+          <div className="mt-auto border-t border-gray-800">
+            <button
+              onClick={() => setShowShortcuts(v => !v)}
+              className="w-full flex items-center justify-center gap-1.5 p-2.5 text-gray-600 hover:text-gray-400 transition-colors text-xs"
+              title="Keyboard shortcuts (?)"
+            >
+              <span className="font-mono bg-gray-800 px-1.5 py-0.5 rounded text-gray-500">?</span>
+              {!leftCollapsed && <span>Shortcuts</span>}
+            </button>
+          </div>
         </aside>
 
         {/* Main Content Area */}
@@ -468,9 +498,78 @@ export default function AppShell() {
 
             {/* Data Export */}
             <DataExport />
+
+            {/* Shortcut hint at bottom of right sidebar */}
+            <button
+              onClick={() => setShowShortcuts(v => !v)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 text-gray-600 hover:text-gray-400 transition-colors text-xs border-t border-gray-800 mt-2 pt-3"
+              title="Keyboard shortcuts (?)"
+            >
+              <span className="font-mono bg-gray-800 px-1.5 py-0.5 rounded text-gray-500">?</span>
+              <span>Shortcuts</span>
+            </button>
           </div>
         </aside>
       </div>
+
+      {/* Keyboard Shortcut Reference Panel */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-80 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-widest">Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="text-gray-500 hover:text-gray-300 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Actions</p>
+                <div className="space-y-2">
+                  {[
+                    { key: 'r', label: 'Refresh data' },
+                    { key: '?', label: 'Show / hide this panel' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-300">{label}</span>
+                      <kbd className="font-mono text-xs bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded">{key}</kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Navigate to view</p>
+                <div className="space-y-2">
+                  {menuItems.filter(m => !['compact', 'accordion'].includes(m.id)).map((item, i) => (
+                    <div key={item.id} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-300">{item.icon} {item.label}</span>
+                      {i < 9 && (
+                        <kbd className="font-mono text-xs bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded">{i + 1}</kbd>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 mt-5">Shortcuts are inactive when a text field is focused.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

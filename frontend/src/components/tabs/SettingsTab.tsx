@@ -4,6 +4,53 @@ import type { Goal } from '../../types'
 import ShareButton from '../features/ShareButton'
 import ReportsSection from '../features/ReportsSection'
 import DashboardConfig from '../features/DashboardConfig'
+import { getApiKey, setApiKey } from '../../hooks/useApiKey'
+
+function ApiKeySettings() {
+  const [key, setKey] = useState(() => getApiKey())
+  const [saved, setSaved] = useState(false)
+
+  function handleSave() {
+    setApiKey(key.trim())
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">API Authentication</h3>
+      <div className="bg-gray-900 rounded-xl p-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-gray-200">API Key</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Set this to match <code className="text-gray-400">APP_API_KEY</code> in your server{`'`}s <code className="text-gray-400">.env</code>.
+            Leave empty if auth is disabled (open LAN mode).
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="password"
+            value={key}
+            onChange={e => setKey(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
+            placeholder="Leave empty to disable auth"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100
+                       focus:outline-none focus:border-blue-500 font-mono"
+          />
+          <button
+            onClick={handleSave}
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded transition-colors"
+          >
+            {saved ? 'Saved ✓' : 'Save'}
+          </button>
+        </div>
+        {!key && (
+          <p className="text-xs text-yellow-500">Auth disabled — all API requests are open.</p>
+        )}
+      </div>
+    </>
+  )
+}
 
 type GoalType = Goal['goal_type']
 
@@ -219,7 +266,12 @@ export default function SettingsTab() {
 
   return (
     <div className="max-w-xl">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Running Targets</h3>
+      {/* API Key */}
+      <ApiKeySettings />
+
+      <div className="mt-10 border-t border-gray-800 pt-6">
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Running Targets</h3>
+      </div>
 
       {error && (
         <p className="text-sm text-red-400 mb-4">{error}</p>

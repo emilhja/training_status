@@ -77,8 +77,9 @@ from .services.analytics import (
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting for /api/fetch — reject if last successful trigger was < 30 seconds ago
-_FETCH_COOLDOWN_SECS = 30
+# Rate limiting for /api/fetch — reject if last successful trigger was < 5 minutes ago.
+# Note: this is in-process memory only; it resets on server restart.
+_FETCH_COOLDOWN_SECS = 300
 _last_fetch_time: float = 0.0
 
 # Determine paths - project root is 3 levels up from api.py (src/training_status/)
@@ -115,44 +116,55 @@ async def lifespan(app: FastAPI) -> Any:  # type: ignore[type-arg]
     settings = get_settings()
     scheduler: BackgroundScheduler | None = None
 
-    if settings.fetch_schedule:
+    # Create scheduler if at least one schedule is configured
+    if settings.fetch_schedule or settings.report_schedule:
         scheduler = BackgroundScheduler()
-        # Parse standard 5-field cron: "minute hour day month day_of_week"
-        fields = settings.fetch_schedule.split()
-        if len(fields) == 5:
-            minute, hour, day, month, day_of_week = fields
-            scheduler.add_job(
-                _run_scheduled_fetch,
-                "cron",
-                minute=minute,
-                hour=hour,
-                day=day,
-                month=month,
-                day_of_week=day_of_week,
-                id="daily_fetch",
-                replace_existing=True,
-            )
-            # Weekly report job
-            if settings.report_schedule:
-                rpt_fields = settings.report_schedule.split()
-                if len(rpt_fields) == 5:
-                    r_min, r_hr, r_day, r_mon, r_dow = rpt_fields
-                    scheduler.add_job(
-                        _run_weekly_report,
-                        "cron",
-                        minute=r_min, hour=r_hr, day=r_day,
-                        month=r_mon, day_of_week=r_dow,
-                        id="weekly_report",
-                        replace_existing=True,
-                    )
 
-            scheduler.start()
-            logger.info("Scheduler started — fetch cron: %s", settings.fetch_schedule)
-        else:
-            logger.warning(
-                "Invalid FETCH_SCHEDULE cron '%s' — scheduler disabled",
-                settings.fetch_schedule,
-            )
+        # Daily fetch job
+        if settings.fetch_schedule:
+            fields = settings.fetch_schedule.split()
+            if len(fields) == 5:
+                minute, hour, day, month, day_of_week = fields
+                scheduler.add_job(
+                    _run_scheduled_fetch,
+                    "cron",
+                    minute=minute,
+                    hour=hour,
+                    day=day,
+                    month=month,
+                    day_of_week=day_of_week,
+                    id="daily_fetch",
+                    replace_existing=True,
+                )
+                logger.info("Fetch job scheduled: %s", settings.fetch_schedule)
+            else:
+                logger.warning(
+                    "Invalid FETCH_SCHEDULE cron '%s' — fetch job disabled",
+                    settings.fetch_schedule,
+                )
+
+        # Weekly report job (independent of fetch schedule)
+        if settings.report_schedule:
+            rpt_fields = settings.report_schedule.split()
+            if len(rpt_fields) == 5:
+                r_min, r_hr, r_day, r_mon, r_dow = rpt_fields
+                scheduler.add_job(
+                    _run_weekly_report,
+                    "cron",
+                    minute=r_min, hour=r_hr, day=r_day,
+                    month=r_mon, day_of_week=r_dow,
+                    id="weekly_report",
+                    replace_existing=True,
+                )
+                logger.info("Report job scheduled: %s", settings.report_schedule)
+            else:
+                logger.warning(
+                    "Invalid REPORT_SCHEDULE cron '%s' — report job disabled",
+                    settings.report_schedule,
+                )
+
+        scheduler.start()
+        logger.info("Scheduler started")
 
     yield
 
@@ -530,7 +542,7 @@ def get_notes(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
 def create_note(note: NoteCreate) -> dict[str, Any]:
     """Add a training log note."""
     db = get_db()
-    db.create_note(note_date=note.note_date, content=note.content)
+    db.create_note(note_date=note.note_date, content=note.content, snapshot_id=note.snapshot_id)
     return {"success": True}
 
 
@@ -595,6 +607,19 @@ def export_csv() -> StreamingResponse:
     )
 
 
+@router.get("/api/export/db")
+def export_db() -> FileResponse:
+    """Download the raw SQLite database file for backup/restore."""
+    settings = get_settings()
+    if not settings.db_path.exists():
+        raise HTTPException(status_code=404, detail="Database file not found")
+    return FileResponse(
+        str(settings.db_path),
+        media_type="application/x-sqlite3",
+        filename="training_status.db",
+    )
+
+
 # --- NEW ANALYTICS ENDPOINTS ---
 
 
@@ -654,7 +679,7 @@ def get_workout_suggestion() -> dict[str, Any]:
             settings = get_settings()
             client = IntervalsClient(settings)
             today_str = date_cls.today().isoformat()
-            acts = client._get("activities", params={"oldest": today_str, "newest": today_str})
+            acts = client._get("activities", params={"oldest": today_str, "newest": today_str}, timeout=5)
             if isinstance(acts, list):
                 today_activities = [a.get("type", "Unknown") for a in acts if a.get("type")]
         except Exception:
@@ -677,7 +702,7 @@ def get_weekly_activities(days: int = Query(default=7, ge=1, le=120)) -> dict[st
     week_ago = (today - timedelta(days=days - 1)).isoformat()
 
     try:
-        acts = client._get("activities", params={"oldest": week_ago, "newest": today.isoformat()})
+        acts = client._get("activities", params={"oldest": week_ago, "newest": today.isoformat()}, timeout=15)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Failed to fetch activities: {e}")
 
@@ -992,6 +1017,9 @@ def get_report(filename: str) -> FileResponse:
         raise HTTPException(status_code=400, detail="Invalid filename")
     settings = get_settings()
     path = settings.reports_dir / filename
+    # Belt-and-suspenders: ensure resolved path stays within reports_dir
+    if not path.resolve().is_relative_to(settings.reports_dir.resolve()):
+        raise HTTPException(status_code=400, detail="Invalid path")
     if not path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
     return FileResponse(str(path), media_type="application/pdf", filename=filename)
@@ -1008,6 +1036,50 @@ def generate_report_now() -> dict[str, Any]:
 
 
 app.include_router(router)
+
+
+# --- HEALTH CHECK (public, no auth) ---
+
+@app.get("/api/health")
+def health_check() -> dict[str, Any]:
+    """Data integrity and liveness check — no auth required.
+
+    Returns DB status, table list, and age of most recent snapshot.
+    Useful as a phone shortcut or monitoring probe.
+    """
+    from datetime import datetime
+
+    db = get_db()
+    tables_ok: list[str] = []
+    try:
+        with db.connection() as conn:
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ).fetchall()
+            tables_ok = [r[0] for r in rows]
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc), "tables": [], "latest_snapshot_age_hours": None}
+
+    latest_age_hours: float | None = None
+    try:
+        row = db.get_latest_snapshot()
+        if row:
+            recorded_at_str = row[1]  # index 1 = recorded_at
+            recorded_dt = datetime.fromisoformat(str(recorded_at_str).replace(" ", "T"))
+            latest_age_hours = round((datetime.now() - recorded_dt).total_seconds() / 3600, 1)
+    except Exception:
+        pass
+
+    expected = {"snapshots", "goals", "personal_records", "training_notes",
+                "gear", "health_events", "annotations", "shared_links"}
+    missing = expected - set(tables_ok)
+
+    return {
+        "status": "ok" if not missing else "degraded",
+        "tables": tables_ok,
+        "missing_tables": sorted(missing),
+        "latest_snapshot_age_hours": latest_age_hours,
+    }
 
 # Serve built frontend with SPA support
 if DIST_DIR.exists():

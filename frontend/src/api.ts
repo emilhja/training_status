@@ -7,6 +7,13 @@ import type {
   GearItem, HealthEvent, AnnotationItem, WeeklyActivitiesData, HealthAnalysisData
 } from './types'
 import { getCached, setCached, deleteCached, clearCache } from './idb'
+import { getApiKey } from './hooks/useApiKey'
+
+/** Returns auth headers if an API key is configured, otherwise empty object. */
+export function authHeaders(): Record<string, string> {
+  const key = getApiKey()
+  return key ? { 'X-API-Key': key } : {}
+}
 
 const CACHE_KEYS = {
   LATEST:             '/api/snapshots/latest',
@@ -28,7 +35,7 @@ const CACHE_KEYS = {
  */
 async function cachedGet<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
-    const res = await fetch(url, signal ? { signal } : undefined)
+    const res = await fetch(url, { headers: authHeaders(), ...(signal ? { signal } : {}) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: T = await res.json()
     setCached(url, data) // fire-and-forget
@@ -50,7 +57,7 @@ export async function fetchSnapshots(limit = 90, signal?: AbortSignal): Promise<
 }
 
 export async function triggerFetch(): Promise<FetchResult> {
-  const res = await fetch('/api/fetch', { method: 'POST' })
+  const res = await fetch('/api/fetch', { method: 'POST', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data: FetchResult = await res.json()
   await clearCache() // new data arrived — invalidate all cached responses
@@ -69,7 +76,7 @@ export async function fetchGoalsHistory(): Promise<{ items: Goal[] }> {
 export async function createGoal(goal_type: string, target_value: number, period_start?: string): Promise<{ success: boolean }> {
   const res = await fetch('/api/goals', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ goal_type, target_value, period_start: period_start ?? null }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -78,7 +85,7 @@ export async function createGoal(goal_type: string, target_value: number, period
 }
 
 export async function deleteGoal(goalId: number): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE' })
+  const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.GOALS)
   return res.json()
@@ -139,11 +146,11 @@ export async function fetchNotes(limit = 50): Promise<{ items: Note[] }> {
   return cachedGet(CACHE_KEYS.NOTES(limit))
 }
 
-export async function createNote(note_date: string, content: string): Promise<{ success: boolean }> {
+export async function createNote(note_date: string, content: string, snapshot_id?: number): Promise<{ success: boolean }> {
   const res = await fetch('/api/notes', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ note_date, content }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ note_date, content, snapshot_id: snapshot_id ?? null }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.NOTES())
@@ -151,7 +158,7 @@ export async function createNote(note_date: string, content: string): Promise<{ 
 }
 
 export async function deleteNote(noteId: number): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+  const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.NOTES())
   return res.json()
@@ -207,7 +214,7 @@ export async function fetchGear(): Promise<{ items: GearItem[] }> {
 
 export async function createGear(data: { name: string; gear_type: string; brand?: string; purchase_date?: string; retirement_km: number }): Promise<{ success: boolean }> {
   const res = await fetch('/api/gear', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -217,7 +224,7 @@ export async function createGear(data: { name: string; gear_type: string; brand?
 
 export async function updateGear(id: number, data: Record<string, unknown>): Promise<{ success: boolean }> {
   const res = await fetch(`/api/gear/${id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -226,7 +233,7 @@ export async function updateGear(id: number, data: Record<string, unknown>): Pro
 }
 
 export async function deleteGear(id: number): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/gear/${id}`, { method: 'DELETE' })
+  const res = await fetch(`/api/gear/${id}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.GEAR)
   return res.json()
@@ -240,7 +247,7 @@ export async function fetchHealthEvents(): Promise<{ items: HealthEvent[] }> {
 
 export async function createHealthEvent(data: { event_date: string; end_date?: string; event_type: string; description: string; tags?: string }): Promise<{ success: boolean }> {
   const res = await fetch('/api/health-events', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -249,7 +256,7 @@ export async function createHealthEvent(data: { event_date: string; end_date?: s
 }
 
 export async function deleteHealthEvent(id: number): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/health-events/${id}`, { method: 'DELETE' })
+  const res = await fetch(`/api/health-events/${id}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.HEALTH_EVENTS)
   return res.json()
@@ -264,7 +271,7 @@ export async function fetchAnnotations(metric?: string): Promise<{ items: Annota
 
 export async function createAnnotation(data: { annotation_date: string; metric: string; content: string }): Promise<{ success: boolean }> {
   const res = await fetch('/api/annotations', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -273,7 +280,7 @@ export async function createAnnotation(data: { annotation_date: string; metric: 
 }
 
 export async function deleteAnnotation(id: number): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/annotations/${id}`, { method: 'DELETE' })
+  const res = await fetch(`/api/annotations/${id}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.ANNOTATIONS)
   return res.json()
@@ -283,7 +290,7 @@ export async function deleteAnnotation(id: number): Promise<{ success: boolean }
 
 export async function createShareLink(expiresDays?: number): Promise<{ token: string; url: string; expires_at: string | null }> {
   const res = await fetch('/api/share', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ expires_days: expiresDays ?? null }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -295,7 +302,7 @@ export async function fetchShareLinks(): Promise<{ items: Array<{ token: string;
 }
 
 export async function revokeShareLink(token: string): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/share/${token}`, { method: 'DELETE' })
+  const res = await fetch(`/api/share/${token}`, { method: 'DELETE', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached('/api/share')
   return res.json()
@@ -312,8 +319,12 @@ export async function fetchReports(): Promise<{ reports: string[] }> {
 }
 
 export async function generateReport(): Promise<{ success: boolean }> {
-  const res = await fetch('/api/reports/generate', { method: 'POST' })
+  const res = await fetch('/api/reports/generate', { method: 'POST', headers: authHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   await deleteCached(CACHE_KEYS.REPORTS)
   return res.json()
+}
+
+export function getExportDbUrl(): string {
+  return '/api/export/db'
 }

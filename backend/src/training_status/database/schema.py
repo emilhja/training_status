@@ -73,6 +73,9 @@ SNAPSHOT_COLUMNS = [
     "respiratory_rate",
 ]
 
+# Frozenset for O(1) membership checks (used in get_snapshots_for_analytics)
+SNAPSHOT_COLUMNS_SET: frozenset[str] = frozenset(SNAPSHOT_COLUMNS)
+
 # Schema migrations - columns added over time
 MIGRATIONS = [
     ("week_0_km", "REAL"),
@@ -125,6 +128,11 @@ MIGRATIONS = [
     ("respiratory_rate", "REAL"),
 ]
 
+# Migrations for non-snapshot tables (applied separately)
+NOTE_MIGRATIONS = [
+    "ALTER TABLE training_notes ADD COLUMN snapshot_id INTEGER",
+]
+
 CREATE_PERSONAL_RECORDS_TABLE = """
     CREATE TABLE IF NOT EXISTS personal_records (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,7 +151,8 @@ CREATE_TRAINING_NOTES_TABLE = """
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at  TEXT NOT NULL,
         note_date   TEXT NOT NULL,
-        content     TEXT NOT NULL
+        content     TEXT NOT NULL,
+        snapshot_id INTEGER
     )
 """
 

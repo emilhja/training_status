@@ -83,6 +83,9 @@ export interface Snapshot {
   strava_total_km: number | null
   strava_run_count: number | null
   strava_ytd_km: number | null
+
+  // Respiratory
+  respiratory_rate: number | null
 }
 
 export interface SnapshotsResponse {
@@ -404,4 +407,35 @@ export interface AnnotationItem {
 export interface DashboardWidget {
   id: string
   visible: boolean
+}
+
+// --- Health Analysis ---
+
+export interface HealthMetricPoint {
+  date: string
+  value: number | null
+}
+
+export interface HealthCorrelation {
+  title: string
+  description: string
+  strength: 'strong' | 'moderate' | 'weak'
+  direction: 'positive' | 'negative'
+}
+
+export interface HealthAnalysisData {
+  readiness_score: number
+  readiness_label: string
+  narrative: string
+  rhr_trend: HealthMetricPoint[]
+  hrv_trend: HealthMetricPoint[]
+  sleep_trend: HealthMetricPoint[]
+  stress_trend: HealthMetricPoint[]
+  atl_trend: HealthMetricPoint[]
+  avg_mood: number | null
+  avg_fatigue: number | null
+  avg_soreness: number | null
+  avg_motivation: number | null
+  correlations: HealthCorrelation[]
+  data_points: number
 }

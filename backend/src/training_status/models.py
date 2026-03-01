@@ -98,6 +98,9 @@ class SnapshotBase(BaseModel):
     strava_run_count: int | None = None
     strava_ytd_km: float | None = None
 
+    # Respiratory
+    respiratory_rate: float | None = None
+
 
 class Snapshot(SnapshotBase):
     """Full snapshot with ID."""
@@ -605,3 +608,38 @@ class SharedLink(BaseModel):
 
 class SharedLinkCreate(BaseModel):
     expires_days: int | None = Field(None, ge=1, le=365)
+
+
+# --- Health Analysis Models ---
+
+
+class HealthMetricPoint(BaseModel):
+    date: str
+    value: float | None
+
+
+class HealthCorrelation(BaseModel):
+    title: str
+    description: str
+    strength: str  # 'strong' | 'moderate' | 'weak'
+    direction: str  # 'positive' | 'negative'
+
+
+class HealthAnalysisResponse(BaseModel):
+    readiness_score: int
+    readiness_label: str
+    narrative: str
+    # Trend series (last 30 days, oldest first)
+    rhr_trend: list[HealthMetricPoint]
+    hrv_trend: list[HealthMetricPoint]
+    sleep_trend: list[HealthMetricPoint]
+    stress_trend: list[HealthMetricPoint]
+    atl_trend: list[HealthMetricPoint]
+    # Wellbeing averages (last 7 days)
+    avg_mood: float | None
+    avg_fatigue: float | None
+    avg_soreness: float | None
+    avg_motivation: float | None
+    # Correlations
+    correlations: list[HealthCorrelation]
+    data_points: int

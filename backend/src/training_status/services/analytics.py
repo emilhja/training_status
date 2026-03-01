@@ -1109,3 +1109,242 @@ def calculate_correlations(
             else "Keep logging data - correlations will appear with more entries"
         ),
     }
+
+
+def calculate_health_analysis(rows: list[tuple]) -> dict:
+    """Comprehensive health analysis from snapshot history.
+
+    rows columns (ordered, most-recent first):
+      recorded_at, resting_hr, hrv, sleep_score, stress,
+      atl, mood, fatigue, soreness, motivation
+    """
+    if not rows:
+        return {
+            "readiness_score": 50,
+            "readiness_label": "Unknown",
+            "narrative": "No health data available yet. Run a fetch to start tracking.",
+            "rhr_trend": [],
+            "hrv_trend": [],
+            "sleep_trend": [],
+            "stress_trend": [],
+            "atl_trend": [],
+            "avg_mood": None,
+            "avg_fatigue": None,
+            "avg_soreness": None,
+            "avg_motivation": None,
+            "correlations": [],
+            "data_points": 0,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Build trend series (oldest-first for chart rendering)
+    # ------------------------------------------------------------------ #
+    def _trend(col_idx: int) -> list[dict]:
+        pts = []
+        for r in reversed(rows):
+            date_str = str(r[0])[:10]
+            val = r[col_idx]
+            pts.append({"date": date_str, "value": val})
+        return pts
+
+    rhr_trend   = _trend(1)
+    hrv_trend   = _trend(2)
+    sleep_trend = _trend(3)
+    stress_trend = _trend(4)
+    atl_trend   = _trend(5)
+
+    # ------------------------------------------------------------------ #
+    # Readiness score (reuse existing logic)
+    # ------------------------------------------------------------------ #
+    latest = rows[0]
+    _, rhr_latest, hrv_latest, sleep_score, stress, atl, mood, fatigue, soreness, motivation = latest
+
+    # HRV trend % vs rolling baseline
+    hrv_values = [r[2] for r in rows if r[2] is not None]
+    hrv_trend_pct: float | None = None
+    if len(hrv_values) >= 3:
+        baseline = sum(hrv_values[1:min(8, len(hrv_values))]) / len(hrv_values[1:min(8, len(hrv_values))])
+        if baseline > 0:
+            hrv_trend_pct = ((hrv_values[0] - baseline) / baseline) * 100
+
+    # Derive pseudo-TSB from ATL for readiness (no TSB in these rows)
+    # Use 0 as neutral — the readiness score accepts None cleanly
+    readiness = calculate_readiness_score(None, hrv_trend_pct, sleep_score, fatigue, soreness)
+    # Penalise high stress if available
+    if stress is not None and stress > 60:
+        readiness["score"] = max(0, readiness["score"] - int((stress - 60) / 4))
+        if readiness["score"] < 60:
+            readiness["label"] = (
+                "Poor" if readiness["score"] < 40
+                else "Fair" if readiness["score"] < 60
+                else readiness["label"]
+            )
+
+    # ------------------------------------------------------------------ #
+    # 7-day wellbeing averages
+    # ------------------------------------------------------------------ #
+    recent7 = rows[:7]
+
+    def _avg(idx: int) -> float | None:
+        vals = [r[idx] for r in recent7 if r[idx] is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    avg_mood       = _avg(6)
+    avg_fatigue    = _avg(7)
+    avg_soreness   = _avg(8)
+    avg_motivation = _avg(9)
+
+    # ------------------------------------------------------------------ #
+    # Cross-metric correlations (health-focused)
+    # ------------------------------------------------------------------ #
+    correlations: list[dict] = []
+    n = len(rows)
+
+    # (A) Stress → next-day RHR
+    if n >= 5:
+        stress_vals = [r[4] for r in rows if r[4] is not None]
+        rhr_vals    = [r[1] for r in rows if r[1] is not None]
+        if len(stress_vals) >= 5 and len(rhr_vals) >= 5:
+            high_stress_rhr = [rhr_vals[i + 1] for i in range(min(len(stress_vals), len(rhr_vals)) - 1)
+                               if stress_vals[i] is not None and stress_vals[i] > 55 and (i + 1) < len(rhr_vals)]
+            low_stress_rhr  = [rhr_vals[i + 1] for i in range(min(len(stress_vals), len(rhr_vals)) - 1)
+                               if stress_vals[i] is not None and stress_vals[i] <= 40 and (i + 1) < len(rhr_vals)]
+            if high_stress_rhr and low_stress_rhr:
+                avg_high = sum(high_stress_rhr) / len(high_stress_rhr)
+                avg_low  = sum(low_stress_rhr)  / len(low_stress_rhr)
+                if avg_high > avg_low + 1.5:
+                    diff = round(avg_high - avg_low, 1)
+                    strength = "strong" if diff > 4 else "moderate"
+                    correlations.append({
+                        "title": "Stress → Elevated RHR",
+                        "description": (
+                            f"After high-stress days (>55), your resting HR is"
+                            f" {diff} bpm higher the next morning"
+                            f" ({avg_high:.0f} vs {avg_low:.0f} bpm)."
+                        ),
+                        "strength": strength,
+                        "direction": "positive",
+                    })
+
+    # (B) Poor sleep → HRV drop
+    if n >= 5:
+        sleep_vals  = [r[3] for r in rows if r[3] is not None]
+        hrv_vals2   = [r[2] for r in rows if r[2] is not None]
+        if len(sleep_vals) >= 5 and len(hrv_vals2) >= 5:
+            poor_sleep_hrv = [hrv_vals2[i + 1] for i in range(min(len(sleep_vals), len(hrv_vals2)) - 1)
+                              if sleep_vals[i] is not None and sleep_vals[i] < 60 and (i + 1) < len(hrv_vals2)]
+            good_sleep_hrv = [hrv_vals2[i + 1] for i in range(min(len(sleep_vals), len(hrv_vals2)) - 1)
+                              if sleep_vals[i] is not None and sleep_vals[i] >= 70 and (i + 1) < len(hrv_vals2)]
+            if poor_sleep_hrv and good_sleep_hrv:
+                avg_poor = sum(poor_sleep_hrv) / len(poor_sleep_hrv)
+                avg_good = sum(good_sleep_hrv) / len(good_sleep_hrv)
+                if avg_good > avg_poor + 2:
+                    diff_pct = round((avg_good - avg_poor) / avg_good * 100)
+                    strength = "strong" if diff_pct > 15 else "moderate"
+                    correlations.append({
+                        "title": "Poor Sleep → Lower HRV",
+                        "description": (
+                            f"After poor-sleep nights (<60 score), your next-day HRV is"
+                            f" {diff_pct}% lower ({avg_poor:.0f} vs {avg_good:.0f} ms)."
+                        ),
+                        "strength": strength,
+                        "direction": "negative",
+                    })
+
+    # (C) High ATL → depressed HRV
+    if n >= 7:
+        atl_vals  = [r[5] for r in rows if r[5] is not None]
+        hrv_vals3 = [r[2] for r in rows if r[2] is not None]
+        if len(atl_vals) >= 7 and len(hrv_vals3) >= 7:
+            atl_list = [v for v in atl_vals if v is not None]
+            if atl_list:
+                atl_median = sorted(atl_list)[len(atl_list) // 2]
+                high_atl_hrv = [hrv_vals3[i] for i in range(min(len(atl_vals), len(hrv_vals3)))
+                                if atl_vals[i] is not None and atl_vals[i] > atl_median * 1.2]
+                low_atl_hrv  = [hrv_vals3[i] for i in range(min(len(atl_vals), len(hrv_vals3)))
+                                if atl_vals[i] is not None and atl_vals[i] < atl_median * 0.8]
+                if high_atl_hrv and low_atl_hrv:
+                    avg_high = sum(high_atl_hrv) / len(high_atl_hrv)
+                    avg_low  = sum(low_atl_hrv)  / len(low_atl_hrv)
+                    if avg_low > avg_high + 2:
+                        diff = round(avg_low - avg_high, 1)
+                        correlations.append({
+                            "title": "High Training Load → Lower HRV",
+                            "description": (
+                                f"During heavy training blocks your HRV drops ~{diff:.0f} ms"
+                                f" ({avg_high:.0f} ms) vs lighter periods ({avg_low:.0f} ms)."
+                            ),
+                            "strength": "moderate",
+                            "direction": "negative",
+                        })
+
+    # ------------------------------------------------------------------ #
+    # Narrative summary
+    # ------------------------------------------------------------------ #
+    score = readiness["score"]
+    label = readiness["label"]
+
+    parts: list[str] = []
+
+    # Overall tone
+    if score >= 80:
+        parts.append(f"You're in great shape today — readiness score {score}/100 ({label}).")
+    elif score >= 60:
+        parts.append(f"You're reasonably recovered — readiness {score}/100 ({label}).")
+    elif score >= 40:
+        parts.append(f"Recovery is below baseline — readiness {score}/100 ({label}).")
+    else:
+        parts.append(f"Your body is showing signs of accumulated fatigue — readiness {score}/100 ({label}).")
+
+    # HRV commentary
+    if hrv_trend_pct is not None:
+        if hrv_trend_pct <= -15:
+            parts.append(f"HRV has dropped {abs(hrv_trend_pct):.0f}% vs recent baseline — a key recovery signal.")
+        elif hrv_trend_pct >= 10:
+            parts.append(f"HRV is up {hrv_trend_pct:.0f}% vs baseline — autonomic recovery is positive.")
+
+    # Sleep commentary
+    if sleep_score is not None:
+        if sleep_score < 60:
+            parts.append(f"Sleep quality is poor ({sleep_score:.0f}/100) — prioritise an earlier bedtime.")
+        elif sleep_score >= 80:
+            parts.append(f"Sleep has been good ({sleep_score:.0f}/100), supporting recovery.")
+
+    # Stress commentary
+    if stress is not None:
+        if stress > 65:
+            parts.append(f"Garmin stress score is elevated ({stress:.0f}/100) — consider a rest day or light movement.")
+        elif stress < 30:
+            parts.append(f"Stress levels are low ({stress:.0f}/100), which is a positive sign.")
+
+    # Subjective wellbeing
+    if avg_fatigue is not None and avg_fatigue >= 3.5:
+        parts.append(f"Subjective fatigue has averaged {avg_fatigue}/5 this week — listen to your body.")
+    if avg_mood is not None and avg_mood <= 2.5:
+        parts.append(f"Mood has been low ({avg_mood}/5). A rest day or social run might help.")
+
+    # Training load impact
+    if atl is not None and atl > 0:
+        if atl > 55:
+            parts.append(f"Acute training load is high (ATL {atl:.0f}), which may be suppressing recovery metrics.")
+        elif atl < 20:
+            parts.append(f"Training load is low (ATL {atl:.0f}) — body has ample capacity to absorb more work.")
+
+    narrative = " ".join(parts) if parts else "Keep logging data to unlock health insights."
+
+    return {
+        "readiness_score": readiness["score"],
+        "readiness_label": readiness["label"],
+        "narrative": narrative,
+        "rhr_trend": rhr_trend,
+        "hrv_trend": hrv_trend,
+        "sleep_trend": sleep_trend,
+        "stress_trend": stress_trend,
+        "atl_trend": atl_trend,
+        "avg_mood": avg_mood,
+        "avg_fatigue": avg_fatigue,
+        "avg_soreness": avg_soreness,
+        "avg_motivation": avg_motivation,
+        "correlations": correlations,
+        "data_points": n,
+    }

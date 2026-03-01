@@ -33,6 +33,7 @@ from .models import (
     HealthEventCreate,
     HealthEventList,
     HealthEventUpdate,
+    HealthAnalysisResponse,
     HrDriftResponse,
     InjuryRisk,
     NoteCreate,
@@ -57,6 +58,7 @@ from .models import (
 from .services.analytics import (
     calculate_consistency_score,
     calculate_correlations,
+    calculate_health_analysis,
     calculate_detraining,
     calculate_goal_adherence,
     calculate_hr_drift,
@@ -75,8 +77,8 @@ from .services.analytics import (
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting for /api/fetch — reject if last successful trigger was < 5 minutes ago
-_FETCH_COOLDOWN_SECS = 300
+# Rate limiting for /api/fetch — reject if last successful trigger was < 30 seconds ago
+_FETCH_COOLDOWN_SECS = 30
 _last_fetch_time: float = 0.0
 
 # Determine paths - project root is 3 levels up from api.py (src/training_status/)
@@ -261,6 +263,14 @@ def get_goals() -> dict[str, Any]:
     """Get all active goals."""
     db = get_db()
     rows = db.get_active_goals()
+    return {"items": [dict(r) for r in rows]}
+
+
+@router.get("/api/goals/history", response_model=GoalList)
+def get_goals_history() -> dict[str, Any]:
+    """Get all goals including historical (inactive) ones."""
+    db = get_db()
+    rows = db.get_all_goals()
     return {"items": [dict(r) for r in rows]}
 
 
@@ -764,6 +774,20 @@ def get_sleep_insights() -> dict[str, Any]:
         columns=["sleep_secs", "sleep_score", "hrv"], limit=60
     )
     return calculate_sleep_insights(rows)
+
+
+@router.get("/api/analytics/health-analysis", response_model=HealthAnalysisResponse)
+def get_health_analysis() -> dict[str, Any]:
+    """Comprehensive health analysis with trends, correlations and narrative."""
+    db = get_db()
+    rows = db.get_snapshots_for_analytics(
+        columns=[
+            "recorded_at", "resting_hr", "hrv", "sleep_score", "stress",
+            "atl", "mood", "fatigue", "soreness", "motivation",
+        ],
+        limit=30,
+    )
+    return calculate_health_analysis(rows)
 
 
 @router.get("/api/analytics/taper", response_model=TaperResponse)

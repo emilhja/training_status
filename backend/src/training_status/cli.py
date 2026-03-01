@@ -228,6 +228,7 @@ def prepare_snapshot_data(iv: dict, sr: dict) -> dict:
         "strava_total_km": sr.get("strava_total_km"),
         "strava_run_count": sr.get("strava_run_count"),
         "strava_ytd_km": sr.get("strava_ytd_km"),
+        "respiratory_rate": iv.get("respiratory_rate"),
         "intervals_json": json.dumps(iv.get("_raw", {})),
         "smashrun_json": json.dumps(sr.get("_raw", {})),
     }

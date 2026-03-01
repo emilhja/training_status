@@ -125,6 +125,14 @@ class Database:
                 "SELECT * FROM goals WHERE is_active = 1 ORDER BY created_at DESC"
             ).fetchall()
 
+    def get_all_goals(self) -> list[sqlite3.Row]:
+        """Get all goals including historical (inactive) ones, newest first."""
+        with self.connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(  # type: ignore[return-value]
+                "SELECT * FROM goals ORDER BY created_at DESC"
+            ).fetchall()
+
     def create_goal(
         self, goal_type: str, target_value: float, period_start: str | None = None
     ) -> None:

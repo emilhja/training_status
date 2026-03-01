@@ -70,6 +70,7 @@ SNAPSHOT_COLUMNS = [
     "strava_total_km",
     "strava_run_count",
     "strava_ytd_km",
+    "respiratory_rate",
 ]
 
 # Schema migrations - columns added over time
@@ -120,6 +121,8 @@ MIGRATIONS = [
     ("strava_total_km", "REAL"),
     ("strava_run_count", "INTEGER"),
     ("strava_ytd_km", "REAL"),
+    # Respiratory
+    ("respiratory_rate", "REAL"),
 ]
 
 CREATE_PERSONAL_RECORDS_TABLE = """
@@ -225,6 +228,7 @@ CREATE_SNAPSHOTS_TABLE = """
         strava_total_km        REAL,
         strava_run_count       INTEGER,
         strava_ytd_km          REAL,
+        respiratory_rate       REAL,
         intervals_json   TEXT,
         smashrun_json    TEXT
     )
@@ -295,6 +299,7 @@ INSERT_SNAPSHOT = """
         avg_days_run_per_week, days_run_am, days_run_pm, days_run_both, most_often_run_day,
         weather_temp, weather_temp_feels_like, weather_humidity, weather_wind_speed, weather_type,
         strava_weekly_km, strava_total_km, strava_run_count, strava_ytd_km,
+        respiratory_rate,
         intervals_json, smashrun_json
     ) VALUES (
         :recorded_at,
@@ -315,6 +320,7 @@ INSERT_SNAPSHOT = """
         :weather_temp, :weather_temp_feels_like, :weather_humidity,
         :weather_wind_speed, :weather_type,
         :strava_weekly_km, :strava_total_km, :strava_run_count, :strava_ytd_km,
+        :respiratory_rate,
         :intervals_json, :smashrun_json
     )
 """

@@ -21,29 +21,31 @@ import {
   fmtSleep, fmt,
 } from '../utils/metrics'
 
-const OverviewView = lazy(() => import('../views/OverviewView'))
-const TrainingView = lazy(() => import('../views/TrainingView'))
-const HealthView   = lazy(() => import('../views/HealthView'))
-const RunningView  = lazy(() => import('../views/RunningView'))
-const TrendsView   = lazy(() => import('../views/TrendsView'))
-const LogView      = lazy(() => import('../views/LogView'))
-const GearView     = lazy(() => import('../views/GearView'))
+const OverviewView        = lazy(() => import('../views/OverviewView'))
+const TrainingView        = lazy(() => import('../views/TrainingView'))
+const HealthView          = lazy(() => import('../views/HealthView'))
+const HealthAnalysisView  = lazy(() => import('../views/HealthAnalysisView'))
+const RunningView         = lazy(() => import('../views/RunningView'))
+const TrendsView          = lazy(() => import('../views/TrendsView'))
+const LogView             = lazy(() => import('../views/LogView'))
+const GearView            = lazy(() => import('../views/GearView'))
 
-type MainView = 'overview' | 'training' | 'health' | 'running' | 'activities' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
+type MainView = 'overview' | 'training' | 'health' | 'analysis' | 'running' | 'activities' | 'trends' | 'log' | 'gear' | 'compact' | 'accordion' | 'settings'
 
-const validViews: MainView[] = ['overview', 'training', 'health', 'running', 'activities', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
+const validViews: MainView[] = ['overview', 'training', 'health', 'analysis', 'running', 'activities', 'trends', 'log', 'gear', 'compact', 'accordion', 'settings']
 const menuItems: { id: MainView; label: string; icon: string }[] = [
-  { id: 'overview',   label: 'Overview',       icon: '⊞' },
-  { id: 'training',   label: 'Training',        icon: '▲' },
-  { id: 'health',     label: 'Health',          icon: '♥' },
-  { id: 'running',    label: 'Running',         icon: '👟' },
-  { id: 'activities', label: 'Activities',      icon: '🏋️' },
-  { id: 'trends',     label: 'Trends',          icon: '📈' },
-  { id: 'log',        label: 'Log',             icon: '📝' },
-  { id: 'gear',       label: 'Gear',            icon: '🏷' },
-  { id: 'compact',    label: 'Compact View',    icon: '⬚' },
-  { id: 'accordion',  label: 'Accordion View',  icon: '☰' },
-  { id: 'settings',   label: 'Settings',        icon: '⚙' },
+  { id: 'overview',   label: 'Overview',        icon: '⊞' },
+  { id: 'training',   label: 'Training',         icon: '▲' },
+  { id: 'health',     label: 'Health',           icon: '♥' },
+  { id: 'analysis',   label: 'Analysis',         icon: '🔬' },
+  { id: 'running',    label: 'Running',          icon: '👟' },
+  { id: 'activities', label: 'Activities',       icon: '🏋️' },
+  { id: 'trends',     label: 'Trends',           icon: '📈' },
+  { id: 'log',        label: 'Log',              icon: '📝' },
+  { id: 'gear',       label: 'Gear',             icon: '🏷' },
+  { id: 'compact',    label: 'Compact View',     icon: '⬚' },
+  { id: 'accordion',  label: 'Accordion View',   icon: '☰' },
+  { id: 'settings',   label: 'Settings',         icon: '⚙' },
 ]
 
 const ViewSpinner = () => (
@@ -111,6 +113,7 @@ export default function AppShell() {
       case 'overview':   return <OverviewView s={s} snapshots={snapshots} />
       case 'training':   return <TrainingView s={s} snapshots={snapshots} />
       case 'health':     return <HealthView s={s} snapshots={snapshots} />
+      case 'analysis':   return <HealthAnalysisView s={s} />
       case 'running':    return <RunningView s={s} snapshots={snapshots} />
       case 'trends':     return <TrendsView snapshots={snapshots} />
       case 'log':        return <LogView />

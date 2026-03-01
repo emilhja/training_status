@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchGoals, createGoal, deleteGoal } from '../../api'
+import { fetchGoals, createGoal, deleteGoal, fetchGoalsHistory } from '../../api'
 import type { Goal } from '../../types'
 import ShareButton from '../features/ShareButton'
 import ReportsSection from '../features/ReportsSection'
@@ -109,6 +109,58 @@ function ReminderSettings() {
         </p>
       </div>
     </>
+  )
+}
+
+const GOAL_TYPE_LABELS: Record<string, string> = {
+  weekly_km: 'Weekly km',
+  monthly_km: 'Monthly km',
+  yearly_km: 'Yearly km',
+  weekly_weightlifting_sessions: 'Weekly sessions',
+}
+
+const GOAL_TYPE_UNITS: Record<string, string> = {
+  weekly_km: 'km',
+  monthly_km: 'km',
+  yearly_km: 'km',
+  weekly_weightlifting_sessions: 'sessions',
+}
+
+function GoalHistory() {
+  const [history, setHistory] = useState<Goal[]>([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (open && history.length === 0) {
+      fetchGoalsHistory().then(d => setHistory(d.items)).catch(() => {})
+    }
+  }, [open, history.length])
+
+  const inactive = history.filter(g => !g.is_active)
+  if (inactive.length === 0 && open) return null
+
+  return (
+    <div className="mt-6">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+      >
+        <span>{open ? '▾' : '▸'}</span> Target history
+      </button>
+      {open && inactive.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {inactive.map(g => (
+            <div key={g.id} className="flex items-center justify-between text-xs py-1.5 px-3 bg-gray-800/50 rounded-lg">
+              <span className="text-gray-500">{GOAL_TYPE_LABELS[g.goal_type] ?? g.goal_type}</span>
+              <span className="text-gray-400 font-medium">
+                {g.target_value} {GOAL_TYPE_UNITS[g.goal_type] ?? ''}
+              </span>
+              <span className="text-gray-600">{g.created_at.slice(0, 10)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -301,6 +353,8 @@ export default function SettingsTab() {
           )
         })()}
       </div>
+
+      <GoalHistory />
 
       {/* Daily Reminder */}
       <div className="mt-10 border-t border-gray-800 pt-6">

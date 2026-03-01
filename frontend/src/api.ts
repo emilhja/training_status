@@ -4,7 +4,7 @@ import type {
   ProjectionsResponse, DetrainingResponse, WeeklySummary, AdherenceReport,
   PersonalRecord, Note, StravaStatus, ReadinessScoreData, WorkoutSuggestionData,
   OverloadResponse, TrainingZonesData, HrDriftData, SleepInsightsData, TaperData,
-  GearItem, HealthEvent, AnnotationItem, WeeklyActivitiesData
+  GearItem, HealthEvent, AnnotationItem, WeeklyActivitiesData, HealthAnalysisData
 } from './types'
 import { getCached, setCached, deleteCached, clearCache } from './idb'
 
@@ -60,6 +60,10 @@ export async function triggerFetch(): Promise<FetchResult> {
 // Goals API
 export async function fetchGoals(): Promise<{ items: Goal[] }> {
   return cachedGet(CACHE_KEYS.GOALS)
+}
+
+export async function fetchGoalsHistory(): Promise<{ items: Goal[] }> {
+  return cachedGet('/api/goals/history')
 }
 
 export async function createGoal(goal_type: string, target_value: number, period_start?: string): Promise<{ success: boolean }> {
@@ -185,6 +189,10 @@ export async function fetchHrDrift(): Promise<HrDriftData> {
 
 export async function fetchSleepInsights(): Promise<SleepInsightsData> {
   return cachedGet('/api/analytics/sleep-insights')
+}
+
+export async function fetchHealthAnalysis(): Promise<HealthAnalysisData> {
+  return cachedGet('/api/analytics/health-analysis')
 }
 
 export async function fetchTaper(raceDate: string, model = 'exponential'): Promise<TaperData> {

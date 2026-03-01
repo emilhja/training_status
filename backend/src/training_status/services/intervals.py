@@ -145,6 +145,7 @@ class IntervalsClient:
             "fatigue": latest.get("fatigue"),
             "soreness": latest.get("soreness"),
             "comments": latest.get("comments"),
+            "respiratory_rate": latest.get("respirationRate"),
         }
 
         # VO2max fallback - search history for most recent non-null value

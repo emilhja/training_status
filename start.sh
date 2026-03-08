@@ -36,10 +36,20 @@ if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
     npm install
 fi
 
+# Free ports if in use by other processes
+for PORT in 8001 5173; do
+    PIDS=$(lsof -ti tcp:$PORT 2>/dev/null || true)
+    if [ -n "$PIDS" ]; then
+        echo "Port $PORT in use — killing stale process(es): $PIDS"
+        kill $PIDS 2>/dev/null || true
+        sleep 0.5
+    fi
+done
+
 # Start backend in background
-echo "Starting backend on http://localhost:8000"
+echo "Starting backend on http://localhost:8001"
 cd "$PROJECT_ROOT/backend"
-uvicorn training_status.api:app --reload --port 8000 --app-dir src &
+uvicorn training_status.api:app --reload --port 8001 --app-dir src &
 BACKEND_PID=$!
 
 # Start frontend in background
@@ -50,7 +60,7 @@ FRONTEND_PID=$!
 
 echo ""
 echo "========================================"
-echo "Backend:  http://localhost:8000"
+echo "Backend:  http://localhost:8001"
 echo "Frontend: http://localhost:5173"
 echo "========================================"
 echo ""
